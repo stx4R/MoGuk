@@ -2,7 +2,9 @@
 
 // 로그인 페이지 — 데스크탑 50:50, Material Design 라벨 애니메이션 S
 import { useState } from 'react';
-import { Eye, EyeOff, Scale, LogIn } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, Scale, LogIn, AlertCircle } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
 
 function FloatingInput({
@@ -49,17 +51,30 @@ function FloatingInput({
 }
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email || !password) return;
     setLoading(true);
-    // TODO: Supabase auth.signInWithPassword 연동
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
+    setError('');
+
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (authError) {
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+      setLoading(false);
+      return;
+    }
+
+    router.push('/');
+    router.refresh();
   };
 
   return (
@@ -103,6 +118,13 @@ export default function LoginPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-0">
+            {error && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-primary/10 border border-red-primary/20 text-red-primary text-sm">
+                <AlertCircle size={15} className="shrink-0" />
+                {error}
+              </div>
+            )}
+
             <FloatingInput
               id="email"
               label="이메일"
