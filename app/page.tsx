@@ -17,7 +17,7 @@ export default function HomePage() {
           {/* 배지 */}
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-red-primary/10 text-red-primary dark:bg-yellow-primary/10 dark:text-yellow-primary border border-red-primary/20 dark:border-yellow-primary/20 mb-6 tracking-wider uppercase">
             <Scale size={12} />
-            2026 · 제 2회 오량모의국회
+            2026 · 제 3회 오량모의국회
           </span>
 
           {/* 메인 타이틀 */}
@@ -28,9 +28,9 @@ export default function HomePage() {
             </span>
           </h1>
           <p className="text-lg max-md:text-base text-gray-500 dark:text-gray-400 mb-10 max-w-xl mx-auto leading-relaxed">
-            민주주의의 가치를 직접 경험하는 청소년 모의 입법 활동.
+            슬로건 1
             <br className="max-md:hidden" />
-            토론하고, 발의하고, 투표하라.
+            슬로건 2
           </p>
 
           {/* CTA 버튼 */}
@@ -64,7 +64,7 @@ export default function HomePage() {
           {[
             { value: '150+', label: '참가 의원' },
             { value: '15', label: '참여 동아리' },
-            { value: '실시간', label: '투표 집계' },
+            { value: '65D', label: '운영 기간' },
           ].map((stat) => (
             <div key={stat.label}>
               <p className="text-4xl font-extrabold text-red-primary dark:text-yellow-primary">

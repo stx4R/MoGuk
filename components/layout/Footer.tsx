@@ -2,7 +2,7 @@
 export default function Footer() {
   return (
     <footer className="w-full text-center py-6 text-sm text-gray-400 dark:text-slate-500 border-t border-gray-200 dark:border-slate-800">
-      <p>© 2026 제 2회 오량모의국회. All rights reserved.</p>
+      <p>© 2026 제 3회 오량모의국회. All rights reserved.</p>
       <p className="mt-1">
         Developed by{' '}
         <a
