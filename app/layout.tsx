@@ -13,6 +13,9 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 export const metadata: Metadata = {
   title: '제 3회 오량모의국회',
   description: '제 3회 오량모의국회 공식 웹사이트입니다.',
+  icons: {
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
