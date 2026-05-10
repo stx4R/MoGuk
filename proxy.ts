@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (profile?.role !== 'admin') {
+    if (!profile || !['admin', 'mod'].includes(profile.role)) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
