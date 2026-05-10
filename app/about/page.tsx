@@ -1,462 +1,448 @@
 'use client';
 
-import { useRef, useEffect, useState, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import * as THREE from 'three';
-import { AnimatePresence, motion } from 'framer-motion';
+import { useRef, useEffect, useState } from 'react';
+import { motion, useInView, animate } from 'framer-motion';
 import { ArrowDown } from 'lucide-react';
 
-// ── Phase 데이터 ──────────────────────────────────────────────────
-const PHASES = [
+// ── 상수 ──────────────────────────────────────────────────────────
+const EASE = [0.16, 1, 0.3, 1] as [number, number, number, number];
+const VP   = { once: true, margin: '-8%' as const };
+
+// ── 데이터 ────────────────────────────────────────────────────────
+const STATS = [
+  { value: 130, suffix: '명',  label: '총 참가자' },
+  { value: 3,   suffix: '개',  label: '교섭단체'  },
+  { value: 35,  suffix: '명',  label: '운영진'    },
+  { value: 2,   suffix: '개월', label: '활동 기간' },
+];
+
+const TIMELINE = [
+  { date: '03/30 ~ 04/03', name: '참가자 모집',  desc: '각 동아리별 참가자 모집' },
+  { date: '04/05 ~ 04/06', name: '행정 처리',    desc: '참가자 선정, 특방 입장 (온라인)' },
+  { date: '05/29 (금)',     name: '개회식',       desc: '대전대신고에서 공식 개회' },
+  { date: '05.29 ~ 07.24', name: '탐구·멘토링',  desc: '정책 탐구 및 구체화, Zoom 멘토링' },
+  { date: '07/25 (토)',     name: '상임위원회',   desc: '안건 심의·토론 / 대전대신고' },
+  { date: '08/01 (토)',     name: '본회의',       desc: '제안설명 → 질의/토론 → 전자 투표 → 시상' },
+];
+
+const ROLES = [
+  { name: '국회의원',      desc: '모든 참가자의 기본 역할. 안건 탐구·제출·심의·투표에 참여한다.' },
+  { name: '교섭단체 간사', desc: '상임위 협의를 위한 교섭단체 대표. 교섭단체 소속 중 선발.' },
+  { name: '원내대표',      desc: '의회에서 소속 당을 대표하여 발언하고 의사결정을 이끄는 역할.' },
+  { name: '당대표',        desc: '정당별 과제 제출을 독려하고 멘토링을 담당하는 리더십 역할.' },
+];
+
+const PARTIES = [
   {
-    label: '대회 기본 정보',
-    object: '법봉',
-    side: 'left' as const,
-    title: '대회 개요 & 일정',
-    items: [
-      '기간: 2026.05.29 (금) ~ 08.01 (토)',
-      '장소: 대전대신고등학교 1·2학년 교실, 백암관',
-      '참가 규모: 진보 40명 · 보수 40명 · 중도 50명',
-      '개회식 → 탐구·멘토링 → 상임위 07.25 → 본회의 08.01',
-    ],
+    name: '진보', count: 40, leader: '조연재', ideology: '친 학생·노동자·외곽',
+    leftBorder: 'border-l-blue-500',
+    dot: 'bg-blue-500',
+    badge: 'bg-blue-500/15 text-blue-400 border border-blue-500/30',
   },
   {
-    label: '참가자 구성',
-    object: '판사옷',
-    side: 'right' as const,
-    title: '역할 & 정당 구성',
-    items: [
-      '모든 참가자: 위원회 위원 / 국회의원 역할',
-      '교섭단체 간사 · 원내대표 · 당대표 선발',
-      '진보 (40) · 보수 (40) · 중도 (50) 3당 체제',
-      '정당별 이념·전략·안건 탐구 병행 운영',
-    ],
+    name: '보수', count: 40, leader: '정재욱', ideology: '친 학교·기업·도심',
+    leftBorder: 'border-l-red-primary',
+    dot: 'bg-red-primary',
+    badge: 'bg-red-primary/15 text-red-primary border border-red-primary/30',
   },
   {
-    label: '활동 과정',
-    object: '의자',
-    side: 'left' as const,
-    title: '활동 흐름 & 평가',
-    items: [
-      '의안 탐구 → 의안 제출 → 상임위원회 → 본회의',
-      '상임위: 안건 심의·토론 후 본회의 상정 결정',
-      '본회의: 제안설명 → 질의/토론 → 전자 투표 표결',
-      '평가: 정책 논리·이해도·참여도·질의응답 근거',
-    ],
+    name: '중도', count: 50, leader: '황성연', ideology: '개인별 상이',
+    leftBorder: 'border-l-yellow-primary',
+    dot: 'bg-yellow-primary',
+    badge: 'bg-yellow-primary/15 text-yellow-primary border border-yellow-primary/30',
   },
 ];
 
-// ── 파티클 배경 ───────────────────────────────────────────────────
-function Particles() {
-  const ref = useRef<THREE.Points>(null!);
-  const count = 200;
-  const positions = useMemo(() => {
-    const arr = new Float32Array(count * 3);
-    for (let i = 0; i < count * 3; i++) arr[i] = (Math.random() - 0.5) * 24;
-    return arr;
-  }, []);
-  useFrame((_, dt) => {
-    ref.current.rotation.y += dt * 0.03;
-    ref.current.rotation.x += dt * 0.012;
-  });
+const PROCESS = [
+  { num: 1, name: '의안 탐구',  date: '05.29 ~ 07.24', desc: '상임위 주제에 맞는 회의안 조사·구체화' },
+  { num: 2, name: '의안 제출',  date: '상임위 전',      desc: '피드백·자구심사 후 최종 안건 확정' },
+  { num: 3, name: '상임위원회', date: '07.25 (토)',     desc: '안건 심의·토론 후 본회의 상정 결정' },
+  { num: 4, name: '본회의',     date: '08.01 (토)',     desc: '제안설명 → 토론 → 전자 투표 → 시상' },
+];
+
+// ── CountUp ──────────────────────────────────────────────────────
+function CountUp({ target, suffix = '' }: { target: number; suffix?: string }) {
+  const ref    = useRef<HTMLSpanElement>(null);
+  const [n, setN] = useState(0);
+  const inView = useInView(ref, { once: true });
+
+  useEffect(() => {
+    if (!inView) return;
+    const ctrl = animate(0, target, {
+      duration: 1.6,
+      ease: EASE,
+      onUpdate: v => setN(Math.round(v)),
+    });
+    return () => ctrl.stop();
+  }, [inView, target]);
+
+  return <span ref={ref}>{n}{suffix}</span>;
+}
+
+// ── SectionHeader ─────────────────────────────────────────────────
+function SectionHeader({ label, title }: { label: string; title: string }) {
   return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-      </bufferGeometry>
-      <pointsMaterial size={0.05} color="#f1c40f" transparent opacity={0.35} sizeAttenuation />
-    </points>
+    <motion.div
+      initial={{ opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={VP}
+      transition={{ duration: 0.7, ease: EASE }}
+      className="mb-12"
+    >
+      <p className="text-[10px] font-bold text-yellow-primary uppercase tracking-[0.35em] mb-3">{label}</p>
+      <h2 className="text-3xl md:text-4xl font-extrabold text-white">{title}</h2>
+    </motion.div>
   );
 }
 
-// ── 법봉 (Gavel) — 뚱뚱한 버전 + 구형 끝 ────────────────────────
-function Gavel({ phaseRef }: { phaseRef: React.RefObject<number> }) {
-  const g = useRef<THREE.Group>(null!);
-  // 흔들림 방지: scale과 baseY를 별도 ref로 관리, position.set()으로 덮어쓰기
-  const sv = useRef(0);
-  const by = useRef(-5);
-
-  useFrame((state, dt) => {
-    const active = phaseRef.current === 0;
-    sv.current = THREE.MathUtils.lerp(sv.current, active ? 1.1 : 0, dt * 3);
-    by.current = THREE.MathUtils.lerp(by.current, active ? 0 : -5, dt * 3);
-    g.current.scale.setScalar(sv.current);
-    g.current.position.set(0, by.current + Math.sin(state.clock.elapsedTime * 0.8) * 0.07, 0);
-    g.current.rotation.y = state.clock.elapsedTime * 0.45;
-  });
-
+// ── TimelineCard ──────────────────────────────────────────────────
+function TimelineCard({ date, name, desc }: { date: string; name: string; desc: string }) {
   return (
-    <group ref={g} scale={0} position={[0, -5, 0]}>
-      {/* 자루 */}
-      <mesh position={[0, -0.58, 0]}>
-        <cylinderGeometry args={[0.082, 0.105, 2.05, 24]} />
-        <meshStandardMaterial color="#7B4A22" roughness={0.3} metalness={0.05} />
-      </mesh>
-      {/* 머리 본체 — 뚱뚱하게 (radius 0.32) */}
-      <mesh position={[0, 0.68, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.32, 0.32, 1.05, 28]} />
-        <meshStandardMaterial color="#2A1200" roughness={0.2} metalness={0.08} />
-      </mesh>
-      {/* 머리 왼쪽 끝 — 구형 */}
-      <mesh position={[-0.525, 0.68, 0]}>
-        <sphereGeometry args={[0.32, 22, 22]} />
-        <meshStandardMaterial color="#2A1200" roughness={0.2} metalness={0.08} />
-      </mesh>
-      {/* 머리 오른쪽 끝 — 구형 */}
-      <mesh position={[0.525, 0.68, 0]}>
-        <sphereGeometry args={[0.32, 22, 22]} />
-        <meshStandardMaterial color="#2A1200" roughness={0.2} metalness={0.08} />
-      </mesh>
-      {/* 중앙 금속 밴드 */}
-      <mesh position={[0, 0.68, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.328, 0.328, 0.14, 28]} />
-        <meshStandardMaterial color="#D4A017" roughness={0.15} metalness={0.85} />
-      </mesh>
-      {/* 자루-머리 연결 금속 링 */}
-      <mesh position={[0, 0.23, 0]}>
-        <torusGeometry args={[0.1, 0.022, 12, 28]} />
-        <meshStandardMaterial color="#D4A017" roughness={0.15} metalness={0.85} />
-      </mesh>
-      {/* 타격판 */}
-      <mesh position={[0, -1.76, 0]}>
-        <boxGeometry args={[1.12, 0.12, 0.74]} />
-        <meshStandardMaterial color="#5A2A00" roughness={0.55} />
-      </mesh>
-    </group>
+    <div className="inline-block rounded-2xl bg-[#141720] border border-white/6 p-5 max-w-xs">
+      <span className="inline-block mb-2 text-xs font-bold px-2.5 py-1 rounded-full bg-red-primary/15 text-red-400 border border-red-primary/25">
+        {date}
+      </span>
+      <p className="font-bold text-white text-sm mb-1">{name}</p>
+      <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+    </div>
   );
 }
-
-// ── 판사옷 (Judge Robe) ───────────────────────────────────────────
-function JudgeRobe({ phaseRef }: { phaseRef: React.RefObject<number> }) {
-  const g = useRef<THREE.Group>(null!);
-  const sv = useRef(0);
-  const by = useRef(-5);
-
-  useFrame((state, dt) => {
-    const active = phaseRef.current === 1;
-    sv.current = THREE.MathUtils.lerp(sv.current, active ? 1.0 : 0, dt * 3);
-    by.current = THREE.MathUtils.lerp(by.current, active ? 0 : -5, dt * 3);
-    g.current.scale.setScalar(sv.current);
-    g.current.position.set(0, by.current + Math.sin(state.clock.elapsedTime * 0.7 + 1) * 0.07, 0);
-    g.current.rotation.y = state.clock.elapsedTime * 0.32;
-  });
-
-  return (
-    <group ref={g} scale={0} position={[0, -5, 0]}>
-      {/* 가운 본체 */}
-      <mesh position={[0, -0.3, 0]}>
-        <cylinderGeometry args={[0.88, 0.55, 3.0, 28]} />
-        <meshStandardMaterial color="#0a0e15" roughness={0.9} />
-      </mesh>
-      {/* 버건디 가슴 패널 */}
-      <mesh position={[0, 0.65, 0.72]}>
-        <boxGeometry args={[0.36, 1.1, 0.06]} />
-        <meshStandardMaterial color="#4A0010" roughness={0.75} />
-      </mesh>
-      {/* 왼쪽 어깨 */}
-      <mesh position={[-0.92, 1.08, 0]} rotation={[0, 0, -0.25]}>
-        <cylinderGeometry args={[0.32, 0.23, 0.55, 20]} />
-        <meshStandardMaterial color="#0a0e15" roughness={0.9} />
-      </mesh>
-      {/* 오른쪽 어깨 */}
-      <mesh position={[0.92, 1.08, 0]} rotation={[0, 0, 0.25]}>
-        <cylinderGeometry args={[0.32, 0.23, 0.55, 20]} />
-        <meshStandardMaterial color="#0a0e15" roughness={0.9} />
-      </mesh>
-      {/* 흰 칼라 */}
-      <mesh position={[0, 1.22, 0.08]}>
-        <cylinderGeometry args={[0.36, 0.4, 0.32, 22]} />
-        <meshStandardMaterial color="#e8e8e2" roughness={0.65} />
-      </mesh>
-      {/* 칼라 주름 링 */}
-      <mesh position={[0, 1.38, 0.08]} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.32, 0.042, 12, 32]} />
-        <meshStandardMaterial color="#ccccca" roughness={0.7} />
-      </mesh>
-      {/* 어깨선 금장 */}
-      <mesh position={[0, 1.02, 0]}>
-        <torusGeometry args={[0.88, 0.022, 12, 32]} />
-        <meshStandardMaterial color="#D4A017" roughness={0.18} metalness={0.82} />
-      </mesh>
-      {/* 허리 금장 */}
-      <mesh position={[0, 0.1, 0]}>
-        <torusGeometry args={[0.77, 0.018, 12, 32]} />
-        <meshStandardMaterial color="#D4A017" roughness={0.18} metalness={0.82} />
-      </mesh>
-    </group>
-  );
-}
-
-// ── 재판장 의자 (Court Chair) ─────────────────────────────────────
-function CourtChair({ phaseRef }: { phaseRef: React.RefObject<number> }) {
-  const g = useRef<THREE.Group>(null!);
-  const sv = useRef(0);
-  const by = useRef(-5);
-
-  useFrame((state, dt) => {
-    const active = phaseRef.current === 2;
-    sv.current = THREE.MathUtils.lerp(sv.current, active ? 0.95 : 0, dt * 3);
-    by.current = THREE.MathUtils.lerp(by.current, active ? 0 : -5, dt * 3);
-    g.current.scale.setScalar(sv.current);
-    g.current.position.set(0, by.current + Math.sin(state.clock.elapsedTime * 0.6 + 2) * 0.07, 0);
-    g.current.rotation.y = state.clock.elapsedTime * 0.28;
-  });
-
-  const legs: [number, number][] = [[-0.52, -0.52], [0.52, -0.52], [-0.52, 0.52], [0.52, 0.52]];
-
-  return (
-    <group ref={g} scale={0} position={[0, -5, 0]}>
-      {/* 좌판 프레임 */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[1.22, 0.1, 1.08]} />
-        <meshStandardMaterial color="#2C1810" roughness={0.38} metalness={0.1} />
-      </mesh>
-      {/* 좌판 쿠션 — 크림슨 */}
-      <mesh position={[0, 0.12, 0]}>
-        <boxGeometry args={[1.08, 0.14, 0.94]} />
-        <meshStandardMaterial color="#8B0000" roughness={0.88} />
-      </mesh>
-      {/* 등받이 프레임 */}
-      <mesh position={[0, 1.0, -0.56]}>
-        <boxGeometry args={[1.22, 1.6, 0.1]} />
-        <meshStandardMaterial color="#2C1810" roughness={0.38} metalness={0.1} />
-      </mesh>
-      {/* 등받이 쿠션 — 크림슨 */}
-      <mesh position={[0, 1.0, -0.51]}>
-        <boxGeometry args={[1.08, 1.46, 0.07]} />
-        <meshStandardMaterial color="#8B0000" roughness={0.88} />
-      </mesh>
-      {/* 상단 크레스트 금장 */}
-      <mesh position={[0, 1.83, -0.52]}>
-        <boxGeometry args={[1.22, 0.07, 0.14]} />
-        <meshStandardMaterial color="#D4A017" roughness={0.18} metalness={0.82} />
-      </mesh>
-      {/* 다이아몬드 엠블럼 — 금 */}
-      <mesh position={[0, 1.05, -0.47]} rotation={[0, 0, Math.PI / 4]}>
-        <boxGeometry args={[0.38, 0.38, 0.04]} />
-        <meshStandardMaterial color="#D4A017" roughness={0.18} metalness={0.82} />
-      </mesh>
-      {/* 다이아몬드 엠블럼 — 청색 내부 */}
-      <mesh position={[0, 1.05, -0.44]} rotation={[0, 0, Math.PI / 4]}>
-        <boxGeometry args={[0.22, 0.22, 0.04]} />
-        <meshStandardMaterial color="#1a3a6b" roughness={0.55} metalness={0.3} />
-      </mesh>
-      {/* 다리 4개 */}
-      {legs.map(([x, z], i) => (
-        <mesh key={i} position={[x, -0.72, z]}>
-          <cylinderGeometry args={[0.06, 0.06, 1.34, 12]} />
-          <meshStandardMaterial color="#4A2800" roughness={0.42} />
-        </mesh>
-      ))}
-      {/* 팔걸이 수평 */}
-      <mesh position={[-0.68, 0.32, -0.06]}>
-        <boxGeometry args={[0.09, 0.07, 0.94]} />
-        <meshStandardMaterial color="#5A3020" roughness={0.42} />
-      </mesh>
-      <mesh position={[0.68, 0.32, -0.06]}>
-        <boxGeometry args={[0.09, 0.07, 0.94]} />
-        <meshStandardMaterial color="#5A3020" roughness={0.42} />
-      </mesh>
-      {/* 팔걸이 받침 */}
-      <mesh position={[-0.68, 0.01, -0.06]}>
-        <boxGeometry args={[0.07, 0.58, 0.07]} />
-        <meshStandardMaterial color="#4A2800" roughness={0.42} />
-      </mesh>
-      <mesh position={[0.68, 0.01, -0.06]}>
-        <boxGeometry args={[0.07, 0.58, 0.07]} />
-        <meshStandardMaterial color="#4A2800" roughness={0.42} />
-      </mesh>
-    </group>
-  );
-}
-
-// ── 3D 씬 ─────────────────────────────────────────────────────────
-function Scene({ phaseRef }: { phaseRef: React.RefObject<number> }) {
-  return (
-    <>
-      <color attach="background" args={['#06090f']} />
-      <fog attach="fog" args={['#06090f', 10, 30]} />
-      <ambientLight intensity={0.3} />
-      <directionalLight position={[4, 8, 5]} intensity={2.5} color="#fff8e8" castShadow />
-      <pointLight position={[-5, 3, 3]} intensity={2.2} color="#c0392b" distance={20} />
-      <pointLight position={[5, 2, -1]} intensity={1.8} color="#f1c40f" distance={20} />
-      {/* 뒤에서 오는 림 라이트 — 어두운 오브젝트를 배경에서 분리 */}
-      <pointLight position={[0, 0, -5.5]} intensity={5.0} color="#d8eaff" distance={18} />
-      <pointLight position={[0, -3, 4]} intensity={1.0} color="#5bc8fa" distance={14} />
-      <Particles />
-      <Gavel phaseRef={phaseRef} />
-      <JudgeRobe phaseRef={phaseRef} />
-      <CourtChair phaseRef={phaseRef} />
-    </>
-  );
-}
-
-// ── 텍스트 패널 애니메이션 ────────────────────────────────────────
-const panelVariants = {
-  enter: (side: 'left' | 'right') => ({
-    opacity: 0,
-    x: side === 'left' ? -60 : 60,
-  }),
-  center: { opacity: 1, x: 0 },
-  exit: (side: 'left' | 'right') => ({
-    opacity: 0,
-    x: side === 'left' ? -40 : 40,
-  }),
-};
 
 // ══════════════════════════════════════════════════════════════════
 // 메인 페이지
 // ══════════════════════════════════════════════════════════════════
 export default function AboutPage() {
-  const [mounted, setMounted]           = useState(false);
-  const [currentPhase, setCurrentPhase] = useState(0);
-  const phaseRef   = useRef<number>(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => setMounted(true), []);
-  useEffect(() => { phaseRef.current = currentPhase; }, [currentPhase]);
-
-  // 스크롤 진행률 → 페이즈 전환
-  useEffect(() => {
-    if (!mounted) return;
-    const onScroll = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      const rect      = el.getBoundingClientRect();
-      const stickyH   = window.innerHeight - 64; // 헤더 4rem
-      const scrolled  = -rect.top;
-      const totalScroll = rect.height - stickyH;
-      const p = Math.max(0, Math.min(1, scrolled / totalScroll));
-      const next = p < 0.33 ? 0 : p < 0.66 ? 1 : 2;
-      if (next !== phaseRef.current) setCurrentPhase(next);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [mounted]);
-
-  const phase = PHASES[currentPhase];
+  const LINE1 = '오량';
+  const LINE2 = '모의국회';
 
   return (
-    <div className="bg-[#06090f]">
+    <div className="bg-[#0a0c12] text-white">
 
-      {/* ── 히어로 ──────────────────────────────────────────────── */}
-      <section className="h-[92vh] flex flex-col items-center justify-center text-center px-4 relative overflow-hidden">
+      {/* ════════════════════════════════════════════════════════
+          1. Hero
+      ════════════════════════════════════════════════════════ */}
+      <section className="relative h-screen flex flex-col items-center justify-center text-center overflow-hidden">
+        {/* 배경 글로우 */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-red-primary/8 rounded-full blur-[120px]" />
-          <div className="absolute top-1/4 right-1/3 w-72 h-72 bg-yellow-primary/6 rounded-full blur-[80px]" />
+          <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[480px] h-[480px] bg-red-primary/10 rounded-full blur-[130px]" />
+          <div className="absolute top-1/3 right-1/4 w-80 h-80 bg-yellow-primary/7 rounded-full blur-[100px]" />
         </div>
-        <motion.div
-          className="relative z-10"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <p className="text-xs font-bold text-yellow-primary uppercase tracking-[0.35em] mb-5">
-            2026 · 제 3회
-          </p>
-          <h1 className="text-6xl md:text-8xl font-black text-white mb-5 leading-[0.95] tracking-tight">
-            오량<br />모의국회
-          </h1>
-          <p className="text-gray-400 text-base md:text-lg mb-10">
-            정책 기반 사회 문제 해결 · 2026.05.29 ~ 08.01
-          </p>
-          <motion.div
-            className="flex flex-col items-center gap-2 text-gray-500"
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+
+        <div className="relative z-10 px-4">
+          {/* 회차 레이블 */}
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: EASE }}
+            className="text-xs font-bold text-yellow-primary uppercase tracking-[0.38em] mb-8"
           >
-            <span className="text-sm tracking-widest uppercase">Scroll</span>
-            <ArrowDown size={16} />
+            2026 · 제 3회
+          </motion.p>
+
+          {/* 타이틀 글자별 슬라이드업 */}
+          {[LINE1, LINE2].map((line, li) => (
+            <div key={li} className="overflow-hidden">
+              <div className="flex justify-center">
+                {line.split('').map((c, ci) => {
+                  const delay = (li === 0 ? ci : LINE1.length + ci) * 0.06;
+                  return (
+                    <motion.span
+                      key={ci}
+                      initial={{ y: 80, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ duration: 0.7, ease: EASE, delay }}
+                      className="text-6xl md:text-[8.5rem] font-black tracking-tight leading-[1.05] inline-block"
+                    >
+                      {c}
+                    </motion.span>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          {/* 서브타이틀 */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.75, duration: 0.8, ease: EASE }}
+            className="text-gray-400 text-base md:text-lg mt-8 mb-12"
+          >
+            정책 기반 사회 문제 해결 · 2026.05.29 ~ 08.01
+          </motion.p>
+
+          {/* 스크롤 인디케이터 */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.0, duration: 0.6 }}
+            className="flex justify-center text-gray-600"
+          >
+            <motion.div
+              animate={{ y: [0, 8, 0] }}
+              transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+            >
+              <ArrowDown size={20} />
+            </motion.div>
           </motion.div>
-        </motion.div>
+        </div>
       </section>
 
-      {/* ── 스크롤 드리븐 3D 섹션 (500vh) ───────────────────────── */}
-      <div ref={containerRef} style={{ height: '500vh' }}>
-        <div
-          className="sticky top-16 overflow-hidden"
-          style={{ height: 'calc(100vh - 4rem)' }}
-        >
-          {/* 3D 캔버스 — 전체 채움 */}
-          {mounted && (
-            <Canvas
-              camera={{ position: [0, 0.8, 5.5], fov: 44 }}
-              gl={{ antialias: true, alpha: false }}
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-            >
-              <Scene phaseRef={phaseRef as React.RefObject<number>} />
-            </Canvas>
-          )}
+      {/* ════════════════════════════════════════════════════════
+          2. 대회 개요 + Stats
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-6 bg-[#0e111a]">
+        <div className="max-w-4xl mx-auto">
+          <SectionHeader label="대회 개요" title="제 3회 오량모의국회" />
 
-          {/* 텍스트 오버레이 */}
-          <div className="relative z-10 w-full h-full pointer-events-none flex items-center">
-            <AnimatePresence mode="wait">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={VP}
+            transition={{ duration: 0.6, ease: EASE, delay: 0.1 }}
+            className="mb-10 flex flex-wrap gap-x-8 gap-y-2 text-sm text-gray-400"
+          >
+            <span>
+              <span className="text-gray-600 font-semibold">장소 · </span>
+              대전대신고등학교 1·2학년 교실, 백암관
+            </span>
+            <span>
+              <span className="text-gray-600 font-semibold">주제 · </span>
+              정책 기반 사회 문제 해결
+            </span>
+          </motion.div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {STATS.map(({ value, suffix, label }, i) => (
               <motion.div
-                key={currentPhase}
-                custom={phase.side}
-                variants={panelVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
-                className={`absolute max-w-[280px] md:max-w-xs px-5 ${
-                  phase.side === 'left'
-                    ? 'left-4 md:left-10 lg:left-16'
-                    : 'right-4 md:right-10 lg:right-16'
-                }`}
+                key={label}
+                initial={{ opacity: 0, y: 32 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={VP}
+                transition={{ duration: 0.65, ease: EASE, delay: i * 0.08 }}
+                className="relative overflow-hidden rounded-2xl bg-[#141720] border border-white/5 p-6"
               >
-                <p className="text-[10px] font-bold text-yellow-primary uppercase tracking-[0.28em] mb-2">
-                  {phase.label}
-                </p>
-                <h2 className="text-xl md:text-2xl lg:text-3xl font-extrabold text-white mb-4 leading-snug">
-                  {phase.title}
-                </h2>
-                <ul className="space-y-2.5">
-                  {phase.items.map((item, i) => (
-                    <li key={i} className="flex gap-2.5 text-sm text-gray-300 leading-relaxed">
-                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-yellow-primary shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
-            </AnimatePresence>
-
-            {/* 오브젝트 인디케이터 */}
-            <div className="absolute bottom-7 left-1/2 -translate-x-1/2 flex gap-2.5">
-              {PHASES.map((p, i) => (
                 <div
-                  key={i}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-500 ${
-                    currentPhase === i
-                      ? 'bg-yellow-primary text-gray-900 scale-110 shadow-[0_0_16px_rgba(241,196,15,0.55)]'
-                      : 'bg-white/10 text-white/40'
-                  }`}
-                >
-                  {p.object}
-                </div>
-              ))}
-            </div>
-
-            {/* 세로 진행 바 */}
-            <div className="absolute right-5 top-1/2 -translate-y-1/2 flex flex-col items-center gap-2">
-              {PHASES.map((_, i) => (
-                <div
-                  key={i}
-                  className={`rounded-full transition-all duration-500 ${
-                    currentPhase === i
-                      ? 'w-1.5 h-8 bg-yellow-primary shadow-[0_0_8px_rgba(241,196,15,0.6)]'
-                      : 'w-1 h-3 bg-white/20'
+                  className={`absolute top-0 left-0 right-0 h-0.5 ${
+                    i % 2 === 0 ? 'bg-red-primary' : 'bg-yellow-primary'
                   }`}
                 />
+                <p className="text-3xl md:text-4xl font-black text-white mb-1">
+                  <CountUp target={value} suffix={suffix} />
+                </p>
+                <p className="text-xs text-gray-500 font-medium">{label}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          3. 일정 타임라인
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-6 bg-[#0a0c12]">
+        <div className="max-w-4xl mx-auto">
+          <SectionHeader label="전체 일정" title="활동 타임라인" />
+
+          <div className="relative">
+            {/* 데스크탑: 중앙 세로 라인 */}
+            <div className="absolute left-1/2 -translate-x-px top-0 bottom-0 w-px bg-white/5 hidden md:block" />
+            <motion.div
+              initial={{ scaleY: 0 }}
+              whileInView={{ scaleY: 1 }}
+              viewport={VP}
+              transition={{ duration: 1.4, ease: EASE }}
+              style={{ originY: 0 }}
+              className="absolute left-1/2 -translate-x-px top-0 bottom-0 w-px bg-gradient-to-b from-red-primary via-yellow-primary to-red-primary hidden md:block"
+            />
+
+            {TIMELINE.map(({ date, name, desc }, i) => {
+              const isLeft = i % 2 === 0;
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: isLeft ? -48 : 48 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={VP}
+                  transition={{ duration: 0.6, ease: EASE, delay: i * 0.07 }}
+                  className="mb-8 md:grid md:grid-cols-[1fr_2rem_1fr] md:gap-8 md:items-center"
+                >
+                  {/* 좌측 */}
+                  <div className={isLeft ? 'md:flex md:justify-end' : ''}>
+                    {isLeft
+                      ? <TimelineCard date={date} name={name} desc={desc} />
+                      : <div className="hidden md:block" />
+                    }
+                  </div>
+
+                  {/* 중앙 도트 */}
+                  <div className="hidden md:flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-[#0a0c12] border-2 border-yellow-primary shadow-[0_0_10px_rgba(241,196,15,0.4)] z-10" />
+                  </div>
+
+                  {/* 우측 */}
+                  <div>
+                    {!isLeft
+                      ? <TimelineCard date={date} name={name} desc={desc} />
+                      : <div className="hidden md:block" />
+                    }
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          4. 참가자 역할
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-6 bg-[#0e111a]">
+        <div className="max-w-4xl mx-auto">
+          <SectionHeader label="참가자 구성" title="참가자 역할" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {ROLES.map(({ name, desc }, i) => (
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, y: 28 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={VP}
+                transition={{ duration: 0.6, ease: EASE, delay: i * 0.09 }}
+                className="flex gap-4 p-5 rounded-2xl bg-[#141720] border border-white/5 hover:border-yellow-primary/20 transition-colors duration-300"
+              >
+                <div className="mt-1.5 w-2 h-2 rounded-full bg-red-primary shrink-0" />
+                <div>
+                  <p className="font-bold text-white text-sm mb-1.5">{name}</p>
+                  <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          5. 정당 구성
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-6 bg-[#0a0c12]">
+        <div className="max-w-4xl mx-auto">
+          <SectionHeader label="정당 구성" title="3당 체제" />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {PARTIES.map(({ name, count, leader, ideology, leftBorder, dot, badge }, i) => (
+              <motion.div
+                key={name}
+                initial={{ opacity: 0, y: 36 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={VP}
+                transition={{ duration: 0.65, ease: EASE, delay: i * 0.1 }}
+                className={`rounded-2xl bg-[#141720] border-t border-r border-b border-white/5 border-l-4 ${leftBorder} p-6`}
+              >
+                <div className="flex items-center gap-3 mb-5">
+                  <div className={`w-2.5 h-2.5 rounded-full ${dot}`} />
+                  <span className="font-extrabold text-white text-lg">{name}</span>
+                  <span className={`ml-auto text-xs font-bold px-2.5 py-1 rounded-full ${badge}`}>
+                    {count}명
+                  </span>
+                </div>
+                <div className="space-y-2.5">
+                  {([['당대표', leader], ['이념', ideology]] as const).map(([k, v]) => (
+                    <div key={k}>
+                      <p className="text-[10px] text-gray-600 font-semibold uppercase tracking-wider mb-0.5">{k}</p>
+                      <p className="text-sm text-gray-300">{v}</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════
+          6. 활동 흐름
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-24 px-6 bg-[#0e111a]">
+        <div className="max-w-4xl mx-auto">
+          <SectionHeader label="활동 과정" title="활동 흐름" />
+
+          {/* 데스크탑: 가로 스테퍼 */}
+          <div className="hidden md:block">
+            <div className="relative">
+              {/* 배경 트랙 */}
+              <div className="absolute left-[12.5%] right-[12.5%] top-5 h-px bg-white/8" />
+              {/* 채워지는 라인 */}
+              <motion.div
+                initial={{ scaleX: 0 }}
+                whileInView={{ scaleX: 1 }}
+                viewport={VP}
+                transition={{ duration: 1.0, ease: EASE, delay: 0.25 }}
+                style={{ originX: 0 }}
+                className="absolute left-[12.5%] right-[12.5%] top-5 h-px bg-gradient-to-r from-red-primary via-yellow-primary to-red-primary"
+              />
+              <div className="grid grid-cols-4">
+                {PROCESS.map(({ num, name, date, desc }, i) => (
+                  <motion.div
+                    key={num}
+                    initial={{ opacity: 0, y: 28 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={VP}
+                    transition={{ duration: 0.6, ease: EASE, delay: i * 0.12 }}
+                    className="flex flex-col items-center text-center px-3"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-red-primary flex items-center justify-center text-white font-black text-sm mb-5 shadow-[0_0_20px_rgba(192,57,43,0.35)] relative z-10">
+                      {num}
+                    </div>
+                    <p className="font-bold text-white text-sm mb-1">{name}</p>
+                    <p className="text-xs text-yellow-primary font-semibold mb-2">{date}</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 모바일: 세로 스테퍼 */}
+          <div className="md:hidden relative pl-10">
+            <div className="absolute left-[18px] top-0 bottom-0 w-px bg-white/8" />
+            <motion.div
+              initial={{ scaleY: 0 }}
+              whileInView={{ scaleY: 1 }}
+              viewport={VP}
+              transition={{ duration: 1.2, ease: EASE }}
+              style={{ originY: 0 }}
+              className="absolute left-[18px] top-0 bottom-0 w-px bg-gradient-to-b from-red-primary to-yellow-primary"
+            />
+            <div className="space-y-8">
+              {PROCESS.map(({ num, name, date, desc }, i) => (
+                <motion.div
+                  key={num}
+                  initial={{ opacity: 0, x: 24 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={VP}
+                  transition={{ duration: 0.55, ease: EASE, delay: i * 0.1 }}
+                  className="relative"
+                >
+                  <div className="absolute -left-[30px] top-4 w-5 h-5 rounded-full bg-red-primary shadow-[0_0_12px_rgba(192,57,43,0.45)] flex items-center justify-center">
+                    <span className="text-[9px] font-black text-white">{num}</span>
+                  </div>
+                  <div className="rounded-xl bg-[#141720] border border-white/5 p-4">
+                    <p className="font-bold text-white text-sm mb-0.5">{name}</p>
+                    <p className="text-xs text-yellow-primary font-semibold mb-1.5">{date}</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+                  </div>
+                </motion.div>
               ))}
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── 푸터 ─────────────────────────────────────────────────── */}
-      <section className="py-16 px-6 text-center border-t border-white/5">
+      {/* ════════════════════════════════════════════════════════
+          Footer
+      ════════════════════════════════════════════════════════ */}
+      <section className="py-16 px-6 text-center border-t border-white/5 bg-[#0a0c12]">
         <p className="text-gray-700 text-sm">제 3회 오량모의국회 · 2026</p>
       </section>
 
