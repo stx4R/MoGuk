@@ -1,0 +1,226 @@
+'use client';
+
+// 회원가입 페이지 — 사전 승인된 이름만 가입 허용 S
+import { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { cn } from '@/utils/cn';
+
+function FloatingInput({
+  id,
+  label,
+  type = 'text',
+  value,
+  onChange,
+  autoComplete,
+}: {
+  id: string;
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+}) {
+  const [focused, setFocused] = useState(false);
+  const lifted = focused || value.length > 0;
+
+  return (
+    <div className="relative mt-6">
+      <input
+        id={id}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        autoComplete={autoComplete ?? id}
+        className="peer w-full px-4 pt-5 pb-2.5 rounded-xl border-2 bg-white dark:bg-dark-surface text-gray-900 dark:text-white text-sm outline-none transition-all duration-200 border-gray-200 dark:border-dark-border focus:border-red-primary dark:focus:border-yellow-primary"
+      />
+      <label
+        htmlFor={id}
+        className={cn(
+          'absolute left-4 text-gray-400 dark:text-gray-500 pointer-events-none transition-all duration-200 origin-left',
+          lifted
+            ? 'top-2 text-xs scale-90 text-red-primary dark:text-yellow-primary'
+            : 'top-1/2 -translate-y-1/2 text-sm'
+        )}
+      >
+        {label}
+      </label>
+    </div>
+  );
+}
+
+export default function SignupPage() {
+  const router = useRouter();
+  const [name, setName]         = useState('');
+  const [email, setEmail]       = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw]     = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState('');
+  const [success, setSuccess]   = useState(false);
+
+  const handleSubmit = async (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    if (!name || !email || !password) return;
+    setLoading(true);
+    setError('');
+
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.error ?? '오류가 발생했습니다.');
+      setLoading(false);
+      return;
+    }
+
+    setSuccess(true);
+    setTimeout(() => router.push('/login'), 2500);
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-8rem)] flex">
+      {/* 좌측 그래픽 패널 */}
+      <div className="hidden md:flex w-1/2 bg-red-primary dark:bg-dark-surface items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          {[...Array(6)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full border-2 border-white"
+              style={{
+                width: `${(i + 1) * 120}px`,
+                height: `${(i + 1) * 120}px`,
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+              }}
+            />
+          ))}
+        </div>
+        <div className="relative z-10 text-center text-white px-12">
+          <UserPlus size={64} className="mx-auto mb-6 opacity-90" />
+          <h2 className="text-3xl font-extrabold mb-3">의원 계정 등록</h2>
+          <p className="text-red-100 dark:text-gray-300 text-sm leading-relaxed">
+            운영진에게 사전 배정받은
+            <br />
+            이름으로만 가입할 수 있습니다.
+          </p>
+        </div>
+      </div>
+
+      {/* 우측 폼 패널 */}
+      <div className="w-full md:w-1/2 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm">
+
+          {success ? (
+            /* 성공 상태 */
+            <div className="text-center">
+              <div className="flex justify-center mb-4">
+                <CheckCircle2 size={56} className="text-green-500" />
+              </div>
+              <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-2">
+                가입 완료!
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                계정이 생성되었습니다.
+                <br />
+                잠시 후 로그인 페이지로 이동합니다.
+              </p>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">
+                회원가입
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
+                운영진에게 배정된 이름을 사용해주세요.
+              </p>
+
+              <form onSubmit={handleSubmit} className="space-y-0">
+                {error && (
+                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-primary/10 border border-red-primary/20 text-red-primary text-sm">
+                    <AlertCircle size={15} className="shrink-0" />
+                    {error}
+                  </div>
+                )}
+
+                <FloatingInput
+                  id="name"
+                  label="이름 (배정된 이름)"
+                  value={name}
+                  onChange={setName}
+                  autoComplete="name"
+                />
+
+                <FloatingInput
+                  id="email"
+                  label="이메일"
+                  type="email"
+                  value={email}
+                  onChange={setEmail}
+                />
+
+                <div className="relative">
+                  <FloatingInput
+                    id="password"
+                    label="비밀번호 (8자 이상)"
+                    type={showPw ? 'text' : 'password'}
+                    value={password}
+                    onChange={setPassword}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowPw((v) => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 mt-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                  >
+                    {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !name || !email || !password}
+                  className={cn(
+                    'w-full mt-8 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm transition-all duration-200',
+                    'bg-red-primary hover:bg-red-hover dark:bg-yellow-primary dark:hover:bg-yellow-hover text-white dark:text-gray-900',
+                    'disabled:opacity-50 disabled:cursor-not-allowed',
+                    'hover:scale-[1.02] active:scale-[0.98]'
+                  )}
+                >
+                  {loading ? (
+                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent dark:border-gray-900 dark:border-t-transparent" />
+                  ) : (
+                    <>
+                      <UserPlus size={16} />
+                      가입하기
+                    </>
+                  )}
+                </button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                이미 계정이 있으신가요?{' '}
+                <Link
+                  href="/login"
+                  className="font-semibold text-red-primary dark:text-yellow-primary hover:underline"
+                >
+                  로그인
+                </Link>
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

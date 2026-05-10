@@ -3,6 +3,7 @@
 // 로그인 페이지 — 데스크탑 50:50, Material Design 라벨 애니메이션 S
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Eye, EyeOff, Scale, LogIn, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
@@ -171,6 +172,16 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
+            계정이 없으신가요?{' '}
+            <Link
+              href="/signup"
+              className="font-semibold text-red-primary dark:text-yellow-primary hover:underline"
+            >
+              회원가입
+            </Link>
+          </p>
         </div>
       </div>
     </div>

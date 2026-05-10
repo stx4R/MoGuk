@@ -19,13 +19,22 @@ create table public.profiles (
   id            uuid        primary key references auth.users(id) on delete cascade,
   name          text        not null,
   role          text        not null default 'user'
-                            check (role in ('admin', 'user')),
+                            check (role in ('admin', 'mod', 'user')),
   club          text,
   is_banned     boolean     not null default false,
   timeout_until timestamptz,
   created_at    timestamptz not null default now()
 );
 comment on table public.profiles is '사용자 프로필 및 권한 관리';
+
+-- 가입 허용 이름 목록 (운영진 사전 등록, Service Role만 접근 가능)
+create table public.allowed_names (
+  name text primary key
+);
+comment on table public.allowed_names is '가입 가능한 사전 승인 이름 목록 — 이 목록에 없는 이름은 회원가입 불가';
+
+alter table public.allowed_names enable row level security;
+-- 정책 없음 = Service Role만 접근 가능 (일반 유저 접근 차단)
 
 -- 실시간 공지
 create table public.announcements (
@@ -128,6 +137,19 @@ as $$
   );
 $$;
 
+-- 현재 로그인 유저가 admin 또는 mod인지 확인
+create or replace function public.is_mod_or_admin()
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role in ('admin', 'mod')
+  );
+$$;
+
 -- 현재 로그인 유저가 차단/타임아웃 상태인지 확인
 create or replace function public.is_restricted()
 returns boolean
@@ -208,19 +230,19 @@ create policy "본인 투표만 삽입 가능 (open 안건, 미차단 유저)"
     )
   );
 
--- admin_chat
-create policy "Admin만 어드민 채팅 조회 가능"
+-- admin_chat (Admin + Mod 접근 가능)
+create policy "Admin/Mod 어드민 채팅 조회 가능"
   on public.admin_chat for select to authenticated
-  using (public.is_admin());
+  using (public.is_mod_or_admin());
 
-create policy "Admin만 어드민 채팅 전송 가능"
+create policy "Admin/Mod 어드민 채팅 전송 가능"
   on public.admin_chat for insert to authenticated
-  with check (public.is_admin() and auth.uid() = author_id);
+  with check (public.is_mod_or_admin() and auth.uid() = author_id);
 
--- admin_logs
-create policy "Admin만 로그 조회 가능"
+-- admin_logs (Admin + Mod 조회, 생성은 Admin만)
+create policy "Admin/Mod 로그 조회 가능"
   on public.admin_logs for select to authenticated
-  using (public.is_admin());
+  using (public.is_mod_or_admin());
 
 create policy "Admin만 로그 생성 가능"
   on public.admin_logs for insert to authenticated

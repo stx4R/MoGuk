@@ -1,6 +1,6 @@
 'use client';
 
-// Admin 전용 3단 대시보드 — Supabase Presence · Chat · 명령어 · 안건관리 완전 연동 S
+// Admin/Mod 3단 대시보드 — Presence · Chat · 명령어(Admin only) · 안건관리(Admin only) S
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Users, Shield, BarChart2, Send,
@@ -16,8 +16,11 @@ type ChatMsg       = { id: string; content: string; is_command: boolean; created
 type AdminLog      = { id: string; action: string; detail: string | null; created_at: string; admin_name: string };
 type AgendaRow     = { id: string; title: string; category: string; is_open: boolean; yes_count: number; no_count: number; abstain_count: number; total_count: number };
 type ConfirmModal  = { title: string; body: string; onConfirm: () => Promise<void> };
+type MyProfile     = { id: string; name: string; role: string };
 
-const COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
+const ADMIN_COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
+const MOD_COMMANDS   = ['/announcement'];
+
 const CMD_HINT: Record<string, string> = {
   '/kick':         '/kick "사용자명"',
   '/ban':          '/ban "사용자명"',
@@ -38,7 +41,6 @@ function parseCommand(input: string) {
   return null;
 }
 
-// ── 시간 포매터 ───────────────────────────────────────────────────
 const fmt = (ts: string) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
@@ -46,7 +48,7 @@ const fmt = (ts: string) =>
 export default function AdminDashboardPage() {
   const supabase = useRef(createClient()).current;
 
-  const [myProfile, setMyProfile]       = useState<{ id: string; name: string } | null>(null);
+  const [myProfile, setMyProfile]       = useState<MyProfile | null>(null);
   const [onlineUsers, setOnlineUsers]   = useState<PresenceUser[]>([]);
   const [messages, setMessages]         = useState<ChatMsg[]>([]);
   const [logs, setLogs]                 = useState<AdminLog[]>([]);
@@ -58,7 +60,9 @@ export default function AdminDashboardPage() {
   const [sending, setSending]           = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // 자동 스크롤
+  const isAdmin = myProfile?.role === 'admin';
+  const availableCommands = isAdmin ? ADMIN_COMMANDS : MOD_COMMANDS;
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   // ── 초기 로드 + 실시간 구독 ──────────────────────────────────────
@@ -68,13 +72,17 @@ export default function AdminDashboardPage() {
     let logCh:      ReturnType<typeof supabase.channel>;
 
     async function init() {
-      // 1. 현재 로그인 프로필
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: prof } = await supabase.from('profiles').select('id, name').eq('id', user.id).single();
-      if (prof) setMyProfile(prof);
 
-      // 2. 채팅 초기 로드 (최근 100개, 프로필 join)
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id, name, role')
+        .eq('id', user.id)
+        .single();
+      if (prof) setMyProfile(prof as MyProfile);
+
+      // 채팅 초기 로드
       const { data: chatInit } = await supabase
         .from('admin_chat')
         .select('id, content, is_command, created_at, profiles!author_id(name)')
@@ -84,7 +92,7 @@ export default function AdminDashboardPage() {
         setMessages(chatInit.map((m: any) => ({ ...m, profile_name: m.profiles?.name ?? '알 수 없음' })));
       }
 
-      // 3. 로그 초기 로드 (최근 30개)
+      // 로그 초기 로드
       const { data: logInit } = await supabase
         .from('admin_logs')
         .select('id, action, detail, created_at, profiles!admin_id(name)')
@@ -94,10 +102,9 @@ export default function AdminDashboardPage() {
         setLogs(logInit.map((l: any) => ({ ...l, admin_name: l.profiles?.name ?? '알 수 없음' })));
       }
 
-      // 4. 안건 로드
       await refreshAgendas();
 
-      // 5. Presence — 전체 접속자 S
+      // Presence
       presenceCh = supabase.channel('online-users', {
         config: { presence: { key: user.id } },
       });
@@ -108,11 +115,11 @@ export default function AdminDashboardPage() {
         })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
-            await presenceCh.track({ user_id: user.id, name: prof?.name ?? 'Admin', online_at: new Date().toISOString() });
+            await presenceCh.track({ user_id: user.id, name: prof?.name ?? 'Staff', online_at: new Date().toISOString() });
           }
         });
 
-      // 6. 채팅 Realtime S
+      // 채팅 Realtime
       chatCh = supabase.channel('admin-chat-stream')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_chat' }, async (payload) => {
           const row = payload.new as any;
@@ -121,7 +128,7 @@ export default function AdminDashboardPage() {
         })
         .subscribe();
 
-      // 7. 로그 Realtime S
+      // 로그 Realtime
       logCh = supabase.channel('admin-log-stream')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_logs' }, async (payload) => {
           const row = payload.new as any;
@@ -147,7 +154,6 @@ export default function AdminDashboardPage() {
     if (data) setAgendas(data as AgendaRow[]);
   }, [supabase]);
 
-  // ── 유저 이름으로 ID 조회 ─────────────────────────────────────────
   const getUserByName = useCallback(async (name: string) => {
     const { data } = await supabase.from('profiles').select('id, name').eq('name', name).single();
     return data as { id: string; name: string } | null;
@@ -157,6 +163,12 @@ export default function AdminDashboardPage() {
   const executeCommand = useCallback(async (input: string) => {
     const cmd = parseCommand(input.trim());
     if (!cmd || !myProfile) return false;
+
+    // Admin 전용 명령어 차단
+    if ((cmd.type === 'kick' || cmd.type === 'ban' || cmd.type === 'timeout') && !isAdmin) {
+      alert('이 명령어는 Admin만 사용할 수 있습니다.');
+      return false;
+    }
 
     if (cmd.type === 'kick' || cmd.type === 'ban') {
       const target = await getUserByName(cmd.name);
@@ -169,13 +181,11 @@ export default function AdminDashboardPage() {
           : `${target.name} 의원을 영구 차단하시겠습니까?\n이 작업은 되돌리기 어렵습니다.`,
         onConfirm: async () => {
           if (cmd.type === 'kick') {
-            // 세션 무효화 (Service Role API) S
             await fetch('/api/admin/kick', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ targetUserId: target.id }),
             });
-            // Realtime 강제퇴장 신호 S
             await supabase.channel(`user-control:${target.id}`).send({
               type: 'broadcast', event: 'force_signout', payload: { action: 'kick' },
             });
@@ -208,7 +218,7 @@ export default function AdminDashboardPage() {
     }
 
     return false;
-  }, [supabase, myProfile, getUserByName]);
+  }, [supabase, myProfile, isAdmin, getUserByName]);
 
   // ── 채팅 전송 ─────────────────────────────────────────────────────
   const handleSend = useCallback(async (e: { preventDefault(): void }) => {
@@ -222,7 +232,7 @@ export default function AdminDashboardPage() {
     if (isCmd) {
       const handled = await executeCommand(chatInput);
       if (!handled) {
-        alert('올바르지 않은 명령어 형식입니다.\n예: /kick "홍길동"');
+        alert('올바르지 않은 명령어 형식입니다.\n예: /announcement "내용"');
         setSending(false);
         return;
       }
@@ -238,7 +248,7 @@ export default function AdminDashboardPage() {
     setSending(false);
   }, [chatInput, myProfile, sending, executeCommand, supabase]);
 
-  // ── 안건 개폐 ─────────────────────────────────────────────────────
+  // ── 안건 개폐 (Admin only) ────────────────────────────────────────
   const toggleAgenda = useCallback(async (id: string, open: boolean) => {
     await supabase.rpc('admin_toggle_agenda', { p_agenda_id: id, p_open: open });
     await refreshAgendas();
@@ -249,7 +259,7 @@ export default function AdminDashboardPage() {
   // ── 렌더 ─────────────────────────────────────────────────────────
   return (
     <>
-      {/* 확인 모달 S */}
+      {/* 확인 모달 */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6">
@@ -311,12 +321,19 @@ export default function AdminDashboardPage() {
           </div>
         </aside>
 
-        {/* ── 중앙: Admin 전용 채팅 + 명령어 ──────────────────────── */}
+        {/* ── 중앙: 채팅 + 명령어 ──────────────────────────────────── */}
         <section className="flex-1 flex flex-col min-w-0 border-r border-gray-200 dark:border-dark-border">
           <div className="px-4 py-3.5 border-b border-gray-200 dark:border-dark-border flex items-center gap-2 shrink-0">
             <Shield size={14} className="text-red-primary dark:text-yellow-primary" />
-            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Admin 전용 채널</span>
+            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
+              {isAdmin ? 'Admin 전용 채널' : 'Staff 채널'}
+            </span>
             <span className="ml-auto text-xs text-gray-400">Private</span>
+            {!isAdmin && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-primary/10 text-yellow-primary font-semibold border border-yellow-primary/20">
+                Mod
+              </span>
+            )}
           </div>
 
           {/* 메시지 목록 */}
@@ -351,7 +368,7 @@ export default function AdminDashboardPage() {
           {/* 명령어 자동완성 팝업 */}
           {showCmds && (
             <div className="mx-4 mb-1 border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-surface shadow-lg">
-              {COMMANDS.filter((c) => c.startsWith(chatInput)).map((cmd) => (
+              {availableCommands.filter((c) => c.startsWith(chatInput)).map((cmd) => (
                 <button
                   key={cmd}
                   onMouseDown={() => { setChatInput(CMD_HINT[cmd] + ' '); setShowCmds(false); }}
@@ -370,7 +387,7 @@ export default function AdminDashboardPage() {
               value={chatInput}
               onChange={(e) => { setChatInput(e.target.value); setShowCmds(e.target.value.startsWith('/')); }}
               onKeyDown={(e) => { if (e.key === 'Escape') setShowCmds(false); }}
-              placeholder='메시지 또는 /명령어 "인자"'
+              placeholder={isAdmin ? '메시지 또는 /명령어 "인자"' : '메시지 또는 /announcement "내용"'}
               className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
             />
             <button
@@ -383,12 +400,12 @@ export default function AdminDashboardPage() {
           </form>
         </section>
 
-        {/* ── 우측: 스탯 + 안건관리 + 로그 ───────────────────────── */}
+        {/* ── 우측: 스탯 + 안건관리(Admin only) + 로그 ──────────────── */}
         <aside className="w-72 shrink-0 bg-gray-50 dark:bg-dark-surface flex flex-col overflow-hidden max-md:hidden">
           <div className="px-4 py-3.5 border-b border-gray-200 dark:border-dark-border shrink-0">
             <div className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200">
               <BarChart2 size={14} className="text-red-primary dark:text-yellow-primary" />
-              현황 & 관리
+              현황 {isAdmin && '& 관리'}
             </div>
           </div>
 
@@ -407,10 +424,10 @@ export default function AdminDashboardPage() {
               ))}
             </div>
 
-            {/* 안건 개폐 관리 */}
+            {/* 안건 목록 — Admin은 개폐 버튼, Mod는 읽기 전용 */}
             <div>
               <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2 px-1">
-                안건 투표 관리
+                안건 투표 {isAdmin ? '관리' : '현황'}
               </p>
               <div className="space-y-1.5">
                 {agendas.map((a) => (
@@ -419,17 +436,28 @@ export default function AdminDashboardPage() {
                       <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{a.title}</p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">{a.total_count}표</p>
                     </div>
-                    <button
-                      onClick={() => toggleAgenda(a.id, !a.is_open)}
-                      className={cn(
-                        'shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors',
+                    {isAdmin ? (
+                      <button
+                        onClick={() => toggleAgenda(a.id, !a.is_open)}
+                        className={cn(
+                          'shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors',
+                          a.is_open
+                            ? 'bg-red-primary/10 text-red-primary hover:bg-red-primary/20'
+                            : 'bg-green-400/10 text-green-600 dark:text-green-400 hover:bg-green-400/20'
+                        )}
+                      >
+                        {a.is_open ? <><XCircle size={12} /> 마감</> : <><CheckCircle2 size={12} /> 개시</>}
+                      </button>
+                    ) : (
+                      <span className={cn(
+                        'shrink-0 px-2 py-1 rounded-lg text-xs font-semibold',
                         a.is_open
-                          ? 'bg-red-primary/10 text-red-primary hover:bg-red-primary/20'
-                          : 'bg-green-400/10 text-green-600 dark:text-green-400 hover:bg-green-400/20'
-                      )}
-                    >
-                      {a.is_open ? <><XCircle size={12} /> 마감</> : <><CheckCircle2 size={12} /> 개시</>}
-                    </button>
+                          ? 'bg-green-400/10 text-green-600 dark:text-green-400'
+                          : 'bg-gray-100 dark:bg-dark-surface text-gray-400'
+                      )}>
+                        {a.is_open ? '진행 중' : '마감'}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

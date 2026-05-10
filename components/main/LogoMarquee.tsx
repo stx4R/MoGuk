@@ -1,6 +1,6 @@
 // 동아리 로고 무한 마키 S
 const CLUBS = [
-  { name: '오량고등학교', abbr: 'OY', color: '#c0392b' },
+  { name: 'L-INK', abbr: 'OY', color: '#c0392b' },
   { name: '동아리 A', abbr: 'DA', color: '#e74c3c' },
   { name: '동아리 B', abbr: 'DB', color: '#c0392b' },
   { name: '동아리 C', abbr: 'DC', color: '#f1c40f' },

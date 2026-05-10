@@ -1,10 +1,9 @@
 'use client';
 
-// 상단 고정 GNB — 스크롤 블러, 모바일 햄버거, 다크모드 토글, 인증 상태 S
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Menu, X, Sun, Moon, LogOut, User } from 'lucide-react';
+import { Menu, X, Sun, Moon, LogOut } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { useTheme } from '@/components/providers/ThemeProvider';
@@ -16,12 +15,27 @@ const NAV_ITEMS = [
   { label: 'Bug Report', href: 'https://github.com/stx4R/Oryang-MOGUK/issues', external: true },
 ];
 
+type Profile = { name: string; role: string };
+
+const ROLE_BADGE: Record<string, string> = {
+  admin: 'bg-red-primary/10 text-red-primary border border-red-primary/30',
+  mod:   'bg-yellow-primary/10 text-yellow-primary border border-yellow-primary/30',
+  user:  'bg-green-400/10 text-green-600 dark:text-green-400 border border-green-400/30',
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Admin',
+  mod:   'Mod',
+  user:  'User',
+};
+
 export default function Header() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const [scrolled, setScrolled] = useState(false);
+  const [scrolled, setScrolled]     = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [user, setUser]             = useState<SupabaseUser | null>(null);
+  const [profile, setProfile]       = useState<Profile | null>(null);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -29,22 +43,43 @@ export default function Header() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // 인증 상태 구독 S
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+
+    async function fetchProfile(userId: string) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('name, role')
+        .eq('id', userId)
+        .single();
+      if (data) setProfile(data as Profile);
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      if (data.user) fetchProfile(data.user.id);
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) fetchProfile(session.user.id);
+      else setProfile(null);
     });
+
     return () => subscription.unsubscribe();
   }, []);
 
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    setProfile(null);
     router.push('/');
     router.refresh();
   };
+
+  const badgeClass  = profile ? (ROLE_BADGE[profile.role]  ?? ROLE_BADGE.user)  : '';
+  const badgeLabel  = profile ? (ROLE_LABEL[profile.role]  ?? profile.role)      : '';
+  const displayName = profile?.name ?? user?.email?.split('@')[0] ?? '';
 
   return (
     <header
@@ -58,6 +93,7 @@ export default function Header() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
+
           {/* 로고 */}
           <Link
             href="/"
@@ -94,10 +130,14 @@ export default function Header() {
             {/* 로그인 / 유저 영역 */}
             {user ? (
               <div className="flex items-center gap-2 ml-1 pl-3 border-l border-gray-200 dark:border-dark-border">
-                <span className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
-                  <User size={14} />
-                  {user.email?.split('@')[0]}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {profile && (
+                    <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold', badgeClass)}>
+                      {badgeLabel}
+                    </span>
+                  )}
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{displayName}</span>
+                </div>
                 <button
                   onClick={handleLogout}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg transition-colors"
@@ -121,11 +161,7 @@ export default function Header() {
               aria-label="테마 전환"
               className="ml-2 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-yellow-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-all duration-200"
             >
-              {theme === 'dark' ? (
-                <Sun size={18} />
-              ) : (
-                <Moon size={18} />
-              )}
+              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
           </nav>
 
@@ -179,13 +215,21 @@ export default function Header() {
 
             {/* 모바일 로그인 / 로그아웃 */}
             {user ? (
-              <button
-                onClick={() => { handleLogout(); setMobileOpen(false); }}
-                className="flex items-center gap-2 px-4 py-3 text-sm font-medium text-red-primary dark:text-yellow-primary rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
-              >
-                <LogOut size={15} />
-                로그아웃 ({user.email?.split('@')[0]})
-              </button>
+              <div className="flex items-center gap-2 px-4 py-3 rounded-lg">
+                {profile && (
+                  <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0', badgeClass)}>
+                    {badgeLabel}
+                  </span>
+                )}
+                <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">{displayName}</span>
+                <button
+                  onClick={() => { handleLogout(); setMobileOpen(false); }}
+                  className="flex items-center gap-1.5 text-sm font-medium text-red-primary dark:text-yellow-primary shrink-0"
+                >
+                  <LogOut size={15} />
+                  로그아웃
+                </button>
+              </div>
             ) : (
               <Link
                 href="/login"
