@@ -1,56 +1,54 @@
-// 동아리 로고 무한 마키 S
+"use client";
+// 동아리 로고 무한 마키 (사진 그레이스케일) H
+import Image from 'next/image';
+
 const CLUBS = [
-  { name: 'L-INK', abbr: 'L-K', color: '#c0392b' },
-  { name: '동아리 A', abbr: 'DA', color: '#e74c3c' },
-  { name: '동아리 B', abbr: 'DB', color: '#c0392b' },
-  { name: '동아리 C', abbr: 'DC', color: '#f1c40f' },
-  { name: '동아리 D', abbr: 'DD', color: '#c0392b' },
-  { name: '동아리 E', abbr: 'DE', color: '#e74c3c' },
-  { name: '동아리 F', abbr: 'DF', color: '#c0392b' },
-  { name: '동아리 G', abbr: 'DG', color: '#f1c40f' },
-  { name: '동아리 H', abbr: 'DH', color: '#c0392b' },
-  { name: '동아리 I', abbr: 'DI', color: '#e74c3c' },
-  { name: '동아리 J', abbr: 'DJ', color: '#c0392b' },
-  { name: '동아리 K', abbr: 'DK', color: '#f1c40f' },
-  { name: '동아리 L', abbr: 'DL', color: '#c0392b' },
-  { name: '동아리 M', abbr: 'DM', color: '#e74c3c' },
-  { name: '동아리 N', abbr: 'DN', color: '#c0392b' },
+  { src: '/clubs/dcn.jpg',               alt: 'DCN' },
+  { src: '/clubs/doyl.png',              alt: 'DOYL' },
+  { src: '/clubs/flow-communicators.jpg',alt: 'Flow Communicators' },
+  { src: '/clubs/nalssam.png',           alt: 'NALSSAM' },
+  { src: '/clubs/one-press.jpg',         alt: 'ONE-PRESS' },
+  { src: '/clubs/path-finder.jpg',       alt: 'Path Finder' },
+  { src: '/clubs/inspire.jpg',           alt: 'inspire' },
+  { src: '/clubs/gyojiphap.png',         alt: '교집합' },
+  { src: '/clubs/eunoia.jpg',            alt: '대전외고 EUNOIA' },
+  { src: '/clubs/right-us.jpg',          alt: '대전외고 Right-us' },
+  { src: '/clubs/unify.png',             alt: '동방고 UNIFY' },
 ];
 
-// 시작과 끝이 이어지도록 두 배 복제 S
 const ALL_CLUBS = [...CLUBS, ...CLUBS];
 
 export default function LogoMarquee() {
   return (
-    <div className="w-full overflow-hidden py-8 bg-gray-50 dark:bg-dark-surface border-y border-gray-100 dark:border-dark-border">
-      <p className="text-center text-xs font-medium text-gray-400 dark:text-gray-500 mb-4 tracking-widest uppercase">
+    <div className="w-full overflow-hidden py-10 bg-gray-50 dark:bg-dark-surface border-y border-gray-100 dark:border-dark-border">
+      <p className="text-center text-xs font-medium text-gray-400 dark:text-gray-500 mb-6 tracking-widest uppercase">
         참여 동아리
       </p>
       <div className="relative flex overflow-hidden">
-        {/* 좌우 페이드 마스크 */}
-        <div className="absolute left-0 top-0 bottom-0 w-20 z-10 bg-gradient-to-r from-gray-50 dark:from-dark-surface to-transparent pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-20 z-10 bg-gradient-to-l from-gray-50 dark:from-dark-surface to-transparent pointer-events-none" />
+        {/* 좌우 페이드 마스크 H */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-gray-50 dark:from-dark-surface to-transparent pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-gray-50 dark:from-dark-surface to-transparent pointer-events-none" />
 
         <div
-          className="flex gap-6 w-max"
-          style={{
-            animation: 'marquee 30s linear infinite',
-          }}
+          className="flex items-center gap-12 w-max"
+          style={{ animation: 'marquee 35s linear infinite' }}
         >
           {ALL_CLUBS.map((club, idx) => (
             <div
               key={idx}
-              className="flex items-center gap-3 px-5 py-3 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg shadow-sm shrink-0 hover:scale-105 transition-transform duration-200"
+              className="shrink-0 flex items-center justify-center w-24 h-16 transition-all duration-300 hover:opacity-100"
+              style={{ filter: 'grayscale(100%) opacity(0.55)' }}
+              onMouseEnter={e => (e.currentTarget.style.filter = 'grayscale(0%) opacity(1)')}
+              onMouseLeave={e => (e.currentTarget.style.filter = 'grayscale(100%) opacity(0.55)')}
             >
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={{ backgroundColor: club.color }}
-              >
-                {club.abbr}
-              </div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
-                {club.name}
-              </span>
+              <Image
+                src={club.src}
+                alt={club.alt}
+                width={96}
+                height={64}
+                className="object-contain w-full h-full"
+                draggable={false}
+              />
             </div>
           ))}
         </div>
