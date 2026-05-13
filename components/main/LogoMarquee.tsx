@@ -1,23 +1,45 @@
 "use client";
-// 동아리 로고 무한 마키 — 투명 배경 PNG 기준, grayscale 필터로 로고만 회색 처리 S
+// 동아리 로고 무한 마키 — 끊김 없는 루프 + 라이트/다크 배경 제거 S
 import Image from 'next/image';
 
 const CLUBS = [
-  { src: '/clubs/dcn.jpg',               alt: 'DCN' },
-  { src: '/clubs/doyl.png',              alt: 'DOYL' },
-  { src: '/clubs/flow-communicators.jpg',alt: 'Flow Communicators' },
-  { src: '/clubs/nalssam.png',           alt: 'NALSSAM' },
-  { src: '/clubs/one-press.jpg',         alt: 'ONE-PRESS' },
-  { src: '/clubs/path-finder.png',       alt: 'Path Finder' },
-  { src: '/clubs/inspire.png',           alt: 'Inspire' },
-  { src: '/clubs/gyojiphap.png',         alt: '교집합' },
-  { src: '/clubs/eunoia.png',            alt: 'EUNOIA' },
-  { src: '/clubs/right-us.jpg',          alt: 'Right-us' },
-  { src: '/clubs/unify.png',             alt: 'UNIFY' },
-  { src: '/clubs/link.png',             alt: 'L-INK' },
+  { src: '/clubs/dcn.jpg',                alt: 'DCN' },
+  { src: '/clubs/doyl.png',               alt: 'DOYL' },
+  { src: '/clubs/flow-communicators.jpg', alt: 'Flow Communicators' },
+  { src: '/clubs/nalssam.png',            alt: 'NALSSAM' },
+  { src: '/clubs/one-press.jpg',          alt: 'ONE-PRESS' },
+  { src: '/clubs/path-finder.png',        alt: 'Path Finder' },
+  { src: '/clubs/inspire.png',            alt: 'Inspire' },
+  { src: '/clubs/gyojiphap.png',          alt: '교집합' },
+  { src: '/clubs/eunoia.png',             alt: 'EUNOIA' },
+  { src: '/clubs/right-us.jpg',           alt: 'Right-us' },
+  { src: '/clubs/unify.png',              alt: 'UNIFY' },
+  { src: '/clubs/link.png',               alt: 'L-INK' },
 ];
 
-const ALL_CLUBS = [...CLUBS, ...CLUBS];
+function ClubList() {
+  return (
+    // pr-12 = gap-12 과 동일한 간격 → 각 복사본 너비가 정확히 동일하여 루프 시 끊김 없음 S
+    <div className="flex items-center gap-12 pr-12">
+      {CLUBS.map((club, idx) => (
+        <div
+          key={idx}
+          className="shrink-0 flex items-center justify-center w-24 h-16"
+        >
+          <Image
+            src={club.src}
+            alt={club.alt}
+            width={96}
+            height={64}
+            className="object-contain w-full h-full mix-blend-multiply dark:mix-blend-normal"
+            style={{ filter: 'var(--logo-filter)' }}
+            draggable={false}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function LogoMarquee() {
   return (
@@ -25,30 +47,20 @@ export default function LogoMarquee() {
       <p className="text-center text-xs font-medium text-gray-400 dark:text-gray-500 mb-6 tracking-widest uppercase">
         협력 동아리
       </p>
-      <div className="relative flex overflow-hidden" style={{ contain: 'layout style' }}>
+      <div className="relative overflow-hidden" style={{ contain: 'layout style' }}>
         <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-gray-50 dark:from-dark-surface to-transparent pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-gray-50 dark:from-dark-surface to-transparent pointer-events-none" />
 
         <div
-          className="flex items-center gap-12 w-max"
-          style={{ animation: 'marquee 35s linear infinite', willChange: 'transform', backfaceVisibility: 'hidden' }}
+          className="flex w-max"
+          style={{
+            animation: 'marquee 35s linear infinite',
+            willChange: 'transform',
+            transform: 'translate3d(0, 0, 0)',
+          }}
         >
-          {ALL_CLUBS.map((club, idx) => (
-            <div
-              key={idx}
-              className="shrink-0 flex items-center justify-center w-24 h-16"
-            >
-              <Image
-                src={club.src}
-                alt={club.alt}
-                width={96}
-                height={64}
-                className="object-contain w-full h-full"
-                style={{ filter: 'grayscale(100%) brightness(0.7)' }}
-                draggable={false}
-              />
-            </div>
-          ))}
+          <ClubList />
+          <ClubList />
         </div>
       </div>
     </div>
