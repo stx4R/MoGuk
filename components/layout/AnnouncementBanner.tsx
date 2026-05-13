@@ -63,10 +63,17 @@ export default function AnnouncementBanner() {
     return () => { cleanup?.(); };
   }, []);
 
-  // 글자 수 비례 스크롤 속도 (가독성 최적화) S
+  // 글자 수 비례 스크롤 속도 (가독성 최적화) — 짧은 텍스트는 느리게, 긴 텍스트는 빠르게 S
   const duration = announcement
-    ? Math.max(8, announcement.content.length * 0.08)
-    : 10;
+    ? Math.max(15, announcement.content.length * 0.18)
+    : 15;
+
+  const copyStyle: { [key: string]: string | number } = {
+    display: 'inline-block',
+    minWidth: '100vw',
+    paddingRight: '3rem',
+    whiteSpace: 'nowrap',
+  };
 
   return (
     <AnimatePresence>
@@ -80,28 +87,24 @@ export default function AnnouncementBanner() {
           className="w-full bg-white text-black overflow-hidden border-b-2 border-red-primary z-40 relative"
           style={{ willChange: 'height' }}
         >
-          <div className="h-full flex items-center overflow-hidden whitespace-nowrap">
-            <motion.span
-              className="inline-block font-bold text-sm"
-              style={{
-                animation: `announcement-scroll ${duration}s linear infinite`,
-              }}
+          <div className="h-full flex items-center overflow-hidden">
+            <span
+              className="inline-flex font-bold text-sm"
+              style={{ animation: `announcement-scroll ${duration}s linear infinite` }}
             >
-              📢&nbsp;
-              {announcement.content}
-              &nbsp;
-              <span className="text-xs font-normal text-gray-500">
-                (Admin {announcement.author})
+              <span style={copyStyle}>
+                📢&nbsp;{announcement.content}&nbsp;
+                <span className="text-xs font-normal text-gray-500">
+                  (Admin {announcement.author})
+                </span>
               </span>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-              📢&nbsp;
-              {announcement.content}
-              &nbsp;
-              <span className="text-xs font-normal text-gray-500">
-                (Admin {announcement.author})
+              <span style={copyStyle}>
+                📢&nbsp;{announcement.content}&nbsp;
+                <span className="text-xs font-normal text-gray-500">
+                  (Admin {announcement.author})
+                </span>
               </span>
-              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            </motion.span>
+            </span>
           </div>
         </motion.div>
       )}

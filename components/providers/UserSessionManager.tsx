@@ -25,11 +25,13 @@ export default function UserSessionManager() {
         .eq('id', user.id)
         .single();
 
-      if (!profile || profile.is_banned) {
+      if (profile?.is_banned === true) {
         await supabase.auth.signOut();
         router.push('/login?reason=banned');
         return;
       }
+
+      if (!profile) return;
 
       // Presence 채널 — role 포함 추적, sync 이벤트로 Context 갱신 S
       presenceChannel = supabase.channel('online-users', {
@@ -38,7 +40,11 @@ export default function UserSessionManager() {
       presenceChannel
         .on('presence', { event: 'sync' }, () => {
           const state = presenceChannel!.presenceState<OnlineUser>();
-          setOnlineUsers(Object.values(state).flat());
+          const all = Object.values(state).flat();
+          const unique = Array.from(
+            new Map(all.map((u) => [(u as OnlineUser).user_id, u as OnlineUser])).values()
+          );
+          setOnlineUsers(unique);
         })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {

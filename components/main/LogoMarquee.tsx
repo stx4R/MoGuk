@@ -1,5 +1,5 @@
 "use client";
-// 동아리 로고 무한 마키 (#bdc3c7 단색 고정, multiply 블렌드로 배경 제거) S
+// 동아리 로고 무한 마키 — 투명 배경 PNG 기준, grayscale 필터로 로고만 회색 처리 S
 import Image from 'next/image';
 
 const CLUBS = [
@@ -43,8 +43,8 @@ export default function LogoMarquee() {
                 alt={club.alt}
                 width={96}
                 height={64}
-                className="object-contain w-full h-full mix-blend-multiply dark:mix-blend-normal"
-                style={{ filter: 'grayscale(100%) brightness(0.76)' }}
+                className="object-contain w-full h-full"
+                style={{ filter: 'grayscale(100%) brightness(0.7)' }}
                 draggable={false}
               />
             </div>

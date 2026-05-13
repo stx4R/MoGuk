@@ -1,8 +1,10 @@
 // 안건 투표 페이지 — 데스크탑: 카드 그리드, 모바일: 아코디언 S
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDown, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
 
 type VoteChoice = 'yes' | 'no' | 'abstain' | null;
@@ -155,6 +157,15 @@ function VoteCard({ item }: { item: AgendaItem }) {
 }
 
 export default function VotePage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }: { data: { user: unknown } }) => {
+      if (!data.user) router.push('/login');
+    });
+  }, [router]);
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="mb-10">
