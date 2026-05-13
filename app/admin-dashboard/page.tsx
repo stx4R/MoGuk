@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Users, Shield, BarChart2, Send,
-  CheckCircle2, XCircle, AlertTriangle, Bell,
+  CheckCircle2, XCircle, AlertTriangle, Bell, Bug,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
@@ -18,6 +18,7 @@ type AgendaRow    = { id: string; title: string; category: string; is_open: bool
 type ConfirmModal = { title: string; body: string; onConfirm: () => Promise<void> };
 type MyProfile    = { id: string; name: string; role: string };
 type AdminCall    = { id: string; caller_id: string; caller_name: string; created_at: string };
+type BugReport    = { id: string; reporter_name: string; title: string; description: string; category: string; created_at: string };
 
 const ADMIN_COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
 const CMD_HINT: Record<string, string> = {
@@ -53,6 +54,7 @@ export default function AdminDashboardPage() {
   const [logs, setLogs]                 = useState<AdminLog[]>([]);
   const [agendas, setAgendas]           = useState<AgendaRow[]>([]);
   const [pendingCalls, setPendingCalls] = useState<AdminCall[]>([]);
+  const [bugReports, setBugReports]     = useState<BugReport[]>([]);
   const [chatInput, setChatInput]       = useState('');
   const [showCmds, setShowCmds]         = useState(false);
   const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
@@ -76,6 +78,7 @@ export default function AdminDashboardPage() {
     let chatCh:  ReturnType<typeof supabase.channel>;
     let logCh:   ReturnType<typeof supabase.channel>;
     let callCh:  ReturnType<typeof supabase.channel>;
+    let bugCh:   ReturnType<typeof supabase.channel> | undefined;
 
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -122,37 +125,57 @@ export default function AdminDashboardPage() {
 
       // 채팅 Realtime
       chatCh = supabase.channel('admin-chat-stream')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_chat' }, async (payload) => {
-          const row = payload.new as any;
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_chat' }, async (payload: { new: any }) => {
+          const row = payload.new;
           const { data: p } = await supabase.from('profiles').select('name').eq('id', row.author_id).single();
-          setMessages((prev) => [...prev, { ...row, profile_name: p?.name ?? '알 수 없음' }]);
+          setMessages((prev: ChatMsg[]) => [...prev, { ...row, profile_name: p?.name ?? '알 수 없음' }]);
         })
         .subscribe();
 
       // 로그 Realtime
       logCh = supabase.channel('admin-log-stream')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_logs' }, async (payload) => {
-          const row = payload.new as any;
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_logs' }, async (payload: { new: any }) => {
+          const row = payload.new;
           const { data: p } = await supabase.from('profiles').select('name').eq('id', row.admin_id).single();
-          setLogs((prev) => [{ ...row, admin_name: p?.name ?? '알 수 없음' }, ...prev].slice(0, 30));
+          setLogs((prev: AdminLog[]) => [{ ...row, admin_name: p?.name ?? '알 수 없음' }, ...prev].slice(0, 30));
         })
         .subscribe();
 
       // 관리자 호출 Realtime
       callCh = supabase.channel('admin-call-stream')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_calls' }, async (payload) => {
-          const row = payload.new as any;
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_calls' }, async (payload: { new: any }) => {
+          const row = payload.new;
           if (row.status !== 'pending') return;
           const { data: p } = await supabase.from('profiles').select('name').eq('id', row.caller_id).single();
-          setPendingCalls(prev => [...prev, { ...row, caller_name: p?.name ?? '알 수 없음' }]);
+          setPendingCalls((prev: AdminCall[]) => [...prev, { ...row, caller_name: p?.name ?? '알 수 없음' }]);
         })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'admin_calls' }, (payload) => {
-          const row = payload.new as any;
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'admin_calls' }, (payload: { new: any }) => {
+          const row = payload.new;
           if (row.status !== 'pending') {
-            setPendingCalls(prev => prev.filter(c => c.id !== row.id));
+            setPendingCalls((prev: AdminCall[]) => prev.filter((c: AdminCall) => c.id !== row.id));
           }
         })
         .subscribe();
+
+      // 버그 제보 초기 로드 + Realtime (Admin만)
+      if (prof?.role === 'admin') {
+        const { data: bugsInit } = await supabase
+          .from('bug_reports')
+          .select('id, title, description, category, created_at, profiles!reporter_id(name)')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (bugsInit) {
+          setBugReports(bugsInit.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? '알 수 없음' })));
+        }
+
+        bugCh = supabase.channel('bug-report-stream')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bug_reports' }, async (payload: { new: any }) => {
+            const row = payload.new;
+            const { data: p } = await supabase.from('profiles').select('name').eq('id', row.reporter_id).single();
+            setBugReports((prev: BugReport[]) => [{ ...row, reporter_name: p?.name ?? '알 수 없음' }, ...prev].slice(0, 10));
+          })
+          .subscribe();
+      }
 
       announceChRef.current = supabase.channel('global:announcements');
       announceChRef.current.subscribe();
@@ -163,6 +186,7 @@ export default function AdminDashboardPage() {
       if (chatCh)  supabase.removeChannel(chatCh);
       if (logCh)   supabase.removeChannel(logCh);
       if (callCh)  supabase.removeChannel(callCh);
+      if (bugCh)   supabase.removeChannel(bugCh);
       if (announceChRef.current) supabase.removeChannel(announceChRef.current);
     };
   }, [supabase]);
@@ -204,10 +228,20 @@ export default function AdminDashboardPage() {
       { room_id: room.id, user_id: call.caller_id },
     ]);
 
-    await supabase.channel(`support-signal:${call.caller_id}`).send({
-      type: 'broadcast',
-      event: 'support_ready',
-      payload: { room_id: room.id },
+    // 구독 후 broadcast — 미구독 상태에서 send하면 전달 안 될 수 있음
+    await new Promise<void>(resolve => {
+      const sigCh = supabase.channel(`support-signal:${call.caller_id}`);
+      sigCh.subscribe(async (status: string) => {
+        if (status === 'SUBSCRIBED') {
+          await sigCh.send({
+            type: 'broadcast',
+            event: 'support_ready',
+            payload: { room_id: room.id },
+          });
+          resolve();
+          setTimeout(() => supabase.removeChannel(sigCh), 1000);
+        }
+      });
     });
 
     setPipRoomId(room.id);
@@ -427,24 +461,39 @@ export default function AdminDashboardPage() {
             )}
           </div>
 
-          {/* 관리자 호출 알림 배너 */}
+          {/* 관리자 호출 알림 — 다수 동시 호출 대응 카드 목록 */}
           {(isAdmin || isMod) && pendingCalls.length > 0 && (
-            <div className="border-b border-yellow-primary/20 bg-yellow-primary/5 px-4 py-2 space-y-1.5 shrink-0">
-              {pendingCalls.map((call) => (
-                <div key={call.id} className="flex items-center gap-2">
-                  <Bell size={13} className="text-yellow-primary shrink-0" />
-                  <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">
-                    <span className="font-semibold">{call.caller_name}</span> 님이 관리자를 호출했습니다
-                    <span className="text-gray-400 dark:text-gray-500 ml-1">({fmt(call.created_at)})</span>
-                  </span>
-                  <button
-                    onClick={() => handleJoinCall(call)}
-                    className="text-xs px-2.5 py-1 rounded-lg bg-yellow-primary text-gray-900 font-semibold hover:bg-yellow-hover transition-colors shrink-0"
+            <div className="border-b border-yellow-primary/20 bg-yellow-primary/5 shrink-0">
+              <div className="px-4 pt-2.5 pb-1 flex items-center gap-2">
+                <Bell size={13} className="text-yellow-primary animate-pulse" />
+                <span className="text-xs font-bold text-yellow-primary">
+                  관리자 호출 {pendingCalls.length}건 대기 중
+                </span>
+              </div>
+              <div className="px-3 pb-2.5 space-y-1.5 max-h-36 overflow-y-auto">
+                {pendingCalls.map((call: AdminCall) => (
+                  <div
+                    key={call.id}
+                    className="flex items-center gap-3 bg-white dark:bg-dark-bg rounded-xl border border-yellow-primary/20 px-3 py-2"
                   >
-                    참가하기
-                  </button>
-                </div>
-              ))}
+                    <div className="w-7 h-7 rounded-full bg-yellow-primary/15 flex items-center justify-center shrink-0">
+                      <Bell size={12} className="text-yellow-primary" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
+                        {call.caller_name}
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{fmt(call.created_at)} 호출</p>
+                    </div>
+                    <button
+                      onClick={() => handleJoinCall(call)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-yellow-primary text-gray-900 font-bold hover:bg-yellow-hover transition-colors shrink-0"
+                    >
+                      참가하기
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -582,6 +631,36 @@ export default function AdminDashboardPage() {
                         <span className="text-gray-400 dark:text-gray-500 shrink-0">{fmt(log.created_at)}</span>
                         <span className="flex-1 text-gray-600 dark:text-gray-400 truncate">{log.detail ?? log.action}</span>
                         <span className="text-red-primary dark:text-yellow-primary font-medium shrink-0">{log.admin_name}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* 버그 제보 (Admin only) */}
+              <div>
+                <p className="text-xs font-bold text-red-primary uppercase tracking-widest mb-2 px-1 flex items-center gap-1.5">
+                  <Bug size={11} />
+                  버그 제보
+                </p>
+                <div className="space-y-1.5">
+                  {bugReports.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-2">제보 없음</p>
+                  ) : (
+                    bugReports.map((bug: BugReport) => (
+                      <div key={bug.id} className="rounded-xl bg-red-primary/5 border border-red-primary/20 px-3 py-2.5 space-y-1">
+                        <div className="flex items-start gap-1.5">
+                          <span className="text-xs font-bold text-red-primary shrink-0">[{bug.category}]</span>
+                          <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 leading-tight">{bug.title}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
+                          {bug.description}
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{bug.reporter_name}</span>
+                          <span className="text-gray-300 dark:text-gray-600">·</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{fmt(bug.created_at)}</span>
+                        </div>
                       </div>
                     ))
                   )}

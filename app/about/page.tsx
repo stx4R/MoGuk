@@ -103,12 +103,12 @@ function SectionHeader({ label, title }: { label: string; title: string }) {
 // ── TimelineCard ──────────────────────────────────────────────────
 function TimelineCard({ date, name, desc }: { date: string; name: string; desc: string }) {
   return (
-    <div className="inline-block rounded-2xl bg-[#141720] border border-white/6 p-5 max-w-xs">
+    <div className="inline-block rounded-2xl bg-[#141720] border border-white/6 p-5">
       <span className="inline-block mb-2 text-xs font-bold px-2.5 py-1 rounded-full bg-red-primary/15 text-red-400 border border-red-primary/25">
         {date}
       </span>
       <p className="font-bold text-white text-sm mb-1">{name}</p>
-      <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+      <p className="text-xs text-gray-400 leading-relaxed whitespace-nowrap">{desc}</p>
     </div>
   );
 }
@@ -117,7 +117,7 @@ function TimelineCard({ date, name, desc }: { date: string; name: string; desc: 
 // 메인 페이지
 // ══════════════════════════════════════════════════════════════════
 export default function AboutPage() {
-  const LINE1 = '제 3회  오량';
+  const LINE1 = '오량';
   const LINE2 = '모의국회';
 
   return (

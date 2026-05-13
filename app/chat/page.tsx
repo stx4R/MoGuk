@@ -140,10 +140,10 @@ export default function ChatPage() {
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'chat_messages',
           filter: `room_id=eq.${selectedRoom!.id}`,
-        }, async (payload) => {
+        }, async (payload: { new: any }) => {
           const row = payload.new as any;
           const { data: p } = await supabase.from('profiles').select('name, role').eq('id', row.author_id).single();
-          setMessages(prev => [...prev, {
+          setMessages((prev: Message[]) => [...prev, {
             ...row,
             author_name: p?.name ?? '알 수 없음',
             author_role: p?.role ?? 'user',
@@ -161,14 +161,14 @@ export default function ChatPage() {
     if (!myProfile) return;
     if (!room.is_member) {
       await supabase.from('chat_room_members').insert({ room_id: room.id, user_id: myProfile.id });
-      setRooms(prev => prev.map(r => r.id === room.id ? { ...r, is_member: true } : r));
+      setRooms((prev: Room[]) => prev.map((r: Room) => r.id === room.id ? { ...r, is_member: true } : r));
     }
     setSelectedRoom({ ...room, is_member: true });
     setMessages([]);
   }, [supabase, myProfile]);
 
   // ── 메시지 전송 ─────────────────────────────────────────────────
-  const handleSend = useCallback(async (e: React.FormEvent) => {
+  const handleSend = useCallback(async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (!input.trim() || !myProfile || !selectedRoom || sending) return;
 
@@ -225,18 +225,27 @@ export default function ChatPage() {
     if (!newRoomName.trim() || !myProfile || creating) return;
     setCreating(true);
 
-    const { data: room } = await supabase
+    const { data: room, error: roomErr } = await supabase
       .from('chat_rooms')
       .insert({ name: newRoomName.trim(), is_public: false, created_by: myProfile.id })
       .select('id, name, is_support')
       .single();
-    if (!room) { setCreating(false); return; }
+    if (!room || roomErr) {
+      alert(`채팅방 생성 실패: ${roomErr?.message ?? '알 수 없는 오류'}\nSupabase에 chat_rooms 테이블이 생성되어 있는지 확인하세요.`);
+      setCreating(false);
+      return;
+    }
 
     const members = [
       { room_id: room.id, user_id: myProfile.id },
       ...inviteList.map(u => ({ room_id: room.id, user_id: u.id })),
     ];
-    await supabase.from('chat_room_members').insert(members);
+    const { error: memberErr } = await supabase.from('chat_room_members').insert(members);
+    if (memberErr) {
+      alert(`멤버 추가 실패: ${memberErr.message}\nSupabase RLS 정책을 확인하세요.`);
+      setCreating(false);
+      return;
+    }
 
     const newRoom: Room = { ...room, is_member: true };
     setRooms(prev => [...prev, newRoom]);
