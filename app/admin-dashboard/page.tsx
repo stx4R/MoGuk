@@ -63,7 +63,8 @@ export default function AdminDashboardPage() {
   const [confirmModal, setConfirmModal]     = useState<ConfirmModal | null>(null);
   const [confirming, setConfirming]         = useState(false);
   const [sending, setSending]               = useState(false);
-  const bottomRef     = useRef<HTMLDivElement>(null);
+  const msgPanelRef   = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
   const announceChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const isAdmin = myProfile?.role === 'admin';
@@ -74,7 +75,17 @@ export default function AdminDashboardPage() {
   const regularUsers = onlineUsers.filter((u: OnlineUser) => u.role === 'user');
   const onlineCount = onlineUsers.length;
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    if (!isAtBottomRef.current) return;
+    const el = msgPanelRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  const handleMsgScroll = useCallback(() => {
+    const el = msgPanelRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  }, []);
 
   // ── 초기 로드 + 실시간 구독 ──────────────────────────────────────
   useEffect(() => {
@@ -604,7 +615,7 @@ export default function AdminDashboardPage() {
           )}
 
           {/* 메시지 목록 */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div ref={msgPanelRef} onScroll={handleMsgScroll} className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map((msg) => (
               <div key={msg.id} className="flex flex-col gap-0.5">
                 <div className="flex items-baseline gap-2">
@@ -629,7 +640,6 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             ))}
-            <div ref={bottomRef} />
           </div>
 
           {/* 명령어 자동완성 (Admin only) */}
