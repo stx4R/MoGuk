@@ -66,9 +66,28 @@ export default function ChatPage() {
   const [searchResults, setSearchResults] = useState<SearchUser[]>([]);
   const [inviteList, setInviteList]       = useState<SearchUser[]>([]);
   const [creating, setCreating]           = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const msgPanelRef  = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // 새 메시지 도착 시 최하단이면 채팅 패널만 스크롤 S
+  useEffect(() => {
+    if (!isAtBottomRef.current) return;
+    const el = msgPanelRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  // 방 전환 시 항상 최하단으로 리셋 S
+  useEffect(() => {
+    isAtBottomRef.current = true;
+    const el = msgPanelRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [selectedRoom]);
+
+  const handleMsgScroll = useCallback(() => {
+    const el = msgPanelRef.current;
+    if (!el) return;
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+  }, []);
 
   // ── 초기 로드 ───────────────────────────────────────────────────
   useEffect(() => {
@@ -338,8 +357,12 @@ export default function ChatPage() {
               </button>
             </div>
 
-            {/* 메시지 목록 */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-dark-bg">
+            {/* 메시지 목록 — ref/onScroll으로 채팅 패널 자체 스크롤만 제어 S */}
+            <div
+              ref={msgPanelRef}
+              onScroll={handleMsgScroll}
+              className="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-dark-bg"
+            >
               {messages.map(msg => (
                 <div key={msg.id} className="flex flex-col gap-0.5">
                   <div className="flex items-baseline gap-2">
@@ -353,7 +376,6 @@ export default function ChatPage() {
                   </p>
                 </div>
               ))}
-              <div ref={bottomRef} />
             </div>
 
             {/* 입력창 */}

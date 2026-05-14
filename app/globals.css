@@ -44,33 +44,21 @@
   }
 }
 
-/* 무한 마키 애니메이션 S */
+/* 무한 마키 애니메이션 — translate3d로 GPU 레이어 강제 S */
 @keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
 }
 
 @keyframes marquee-reverse {
-  from {
-    transform: translateX(-50%);
-  }
-  to {
-    transform: translateX(0);
-  }
+  0%   { transform: translate3d(-50%, 0, 0); }
+  100% { transform: translate3d(0, 0, 0); }
 }
 
 /* 공지 텍스트 마키 S */
 @keyframes announcement-scroll {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
 }
 
 /* 파티클 부유 애니메이션 S */
@@ -89,14 +77,6 @@
     transform: translateY(-100vh) rotate(360deg);
     opacity: 0;
   }
-}
-
-/* 동아리 로고 필터 — 라이트: grayscale, 다크: invert+grayscale (흰배경 제거) S */
-:root {
-  --logo-filter: grayscale(100%) brightness(0.68);
-}
-.dark {
-  --logo-filter: invert(1) grayscale(100%) brightness(0.88);
 }
 
 /* 글로벌 베이스 스타일 S */

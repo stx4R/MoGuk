@@ -13,6 +13,7 @@ const ROLE_COLOR: Record<string, string> = {
   mod:   'text-yellow-primary',
   user:  'text-green-600 dark:text-green-400',
 };
+const ROLE_RANK: Record<string, number> = { admin: 2, mod: 1, user: 0 };
 
 type Message = {
   id: string;
@@ -30,12 +31,13 @@ const fmt = (ts: string) =>
 
 export default function PIPChat() {
   const { pipRoomId, setPipRoomId } = usePIPChat();
-  const [minimized, setMinimized] = useState(false);
-  const [messages, setMessages]   = useState<Message[]>([]);
-  const [myProfile, setMyProfile] = useState<MyProfile | null>(null);
-  const [roomName, setRoomName]   = useState('');
-  const [input, setInput]         = useState('');
-  const [sending, setSending]     = useState(false);
+  const [minimized, setMinimized]   = useState(false);
+  const [messages, setMessages]     = useState<Message[]>([]);
+  const [myProfile, setMyProfile]   = useState<MyProfile | null>(null);
+  const [roomName, setRoomName]     = useState('');
+  const [isSupport, setIsSupport]   = useState(false);
+  const [input, setInput]           = useState('');
+  const [sending, setSending]       = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const supabase  = useRef(createClient()).current;
 
@@ -53,14 +55,14 @@ export default function PIPChat() {
 
   // 방 변경 시 메시지 로드 + 실시간 구독
   useEffect(() => {
-    if (!pipRoomId) { setMessages([]); setRoomName(''); return; }
+    if (!pipRoomId) { setMessages([]); setRoomName(''); setIsSupport(false); return; }
 
     let ch: ReturnType<typeof supabase.channel>;
 
     async function loadRoom() {
       const { data: room } = await supabase
-        .from('chat_rooms').select('name').eq('id', pipRoomId).single();
-      if (room) setRoomName(room.name);
+        .from('chat_rooms').select('name, is_support').eq('id', pipRoomId).single();
+      if (room) { setRoomName(room.name); setIsSupport(room.is_support ?? false); }
 
       const { data: msgs } = await supabase
         .from('chat_messages')
@@ -97,6 +99,22 @@ export default function PIPChat() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || !myProfile || !pipRoomId || sending) return;
+
+    // /end 커맨드 — 지원방 종료 (Admin/Mod만) S
+    if (input.trim() === '/end' && isSupport) {
+      const rank = ROLE_RANK[myProfile.role] ?? 0;
+      if (rank >= 1) {
+        await supabase.from('chat_messages').insert({
+          room_id: pipRoomId, author_id: myProfile.id,
+          content: '관리자가 지원을 종료했습니다.', is_system: true,
+        });
+        await supabase.from('chat_rooms').delete().eq('id', pipRoomId);
+        setPipRoomId(null);
+        setInput('');
+        return;
+      }
+    }
+
     setSending(true);
     await supabase.from('chat_messages').insert({
       room_id: pipRoomId,
@@ -159,7 +177,7 @@ export default function PIPChat() {
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder="메시지를 입력하세요..."
+              placeholder={isSupport && (ROLE_RANK[myProfile?.role ?? 'user'] ?? 0) >= 1 ? '메시지 또는 /end 로 종료' : '메시지를 입력하세요...'}
               className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-xs text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
             />
             <button

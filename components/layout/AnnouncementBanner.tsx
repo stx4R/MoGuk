@@ -90,7 +90,10 @@ export default function AnnouncementBanner() {
           <div className="h-full flex items-center overflow-hidden">
             <span
               className="inline-flex font-bold text-sm"
-              style={{ animation: `announcement-scroll ${duration}s linear infinite` }}
+              style={{
+                animation: `announcement-scroll ${duration}s linear infinite`,
+                willChange: 'transform',
+              }}
             >
               <span style={copyStyle}>
                 📢&nbsp;{announcement.content}&nbsp;
