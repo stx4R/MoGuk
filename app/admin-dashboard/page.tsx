@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Users, Shield, BarChart2, Send,
-  CheckCircle2, XCircle, AlertTriangle, Bell, Bug,
+  CheckCircle2, XCircle, AlertTriangle, Bell, Bug, X,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
@@ -18,7 +18,7 @@ type AgendaRow    = { id: string; title: string; category: string; is_open: bool
 type ConfirmModal = { title: string; body: string; onConfirm: () => Promise<void> };
 type MyProfile    = { id: string; name: string; role: string };
 type AdminCall    = { id: string; caller_id: string; caller_name: string; created_at: string };
-type BugReport    = { id: string; reporter_name: string; title: string; description: string; category: string; created_at: string };
+type BugReport    = { id: string; reporter_name: string; title: string; description: string; category: string; created_at: string; resolved: boolean };
 
 const ADMIN_COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
 const CMD_HINT: Record<string, string> = {
@@ -54,12 +54,15 @@ export default function AdminDashboardPage() {
   const [logs, setLogs]                 = useState<AdminLog[]>([]);
   const [agendas, setAgendas]           = useState<AgendaRow[]>([]);
   const [pendingCalls, setPendingCalls] = useState<AdminCall[]>([]);
-  const [bugReports, setBugReports]     = useState<BugReport[]>([]);
-  const [chatInput, setChatInput]       = useState('');
-  const [showCmds, setShowCmds]         = useState(false);
-  const [confirmModal, setConfirmModal] = useState<ConfirmModal | null>(null);
-  const [confirming, setConfirming]     = useState(false);
-  const [sending, setSending]           = useState(false);
+  const [bugReports, setBugReports]         = useState<BugReport[]>([]);
+  const [showBugModal, setShowBugModal]     = useState(false);
+  const [allBugReports, setAllBugReports]   = useState<BugReport[]>([]);
+  const [bugModalLoading, setBugModalLoading] = useState(false);
+  const [chatInput, setChatInput]           = useState('');
+  const [showCmds, setShowCmds]             = useState(false);
+  const [confirmModal, setConfirmModal]     = useState<ConfirmModal | null>(null);
+  const [confirming, setConfirming]         = useState(false);
+  const [sending, setSending]               = useState(false);
   const bottomRef     = useRef<HTMLDivElement>(null);
   const announceChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
@@ -161,18 +164,18 @@ export default function AdminDashboardPage() {
       if (prof?.role === 'admin') {
         const { data: bugsInit } = await supabase
           .from('bug_reports')
-          .select('id, title, description, category, created_at, profiles!reporter_id(name)')
+          .select('id, title, description, category, created_at, resolved, profiles!reporter_id(name)')
           .order('created_at', { ascending: false })
           .limit(10);
         if (bugsInit) {
-          setBugReports(bugsInit.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? '알 수 없음' })));
+          setBugReports(bugsInit.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? '알 수 없음', resolved: b.resolved ?? false })));
         }
 
         bugCh = supabase.channel('bug-report-stream')
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bug_reports' }, async (payload: { new: any }) => {
             const row = payload.new;
             const { data: p } = await supabase.from('profiles').select('name').eq('id', row.reporter_id).single();
-            setBugReports((prev: BugReport[]) => [{ ...row, reporter_name: p?.name ?? '알 수 없음' }, ...prev].slice(0, 10));
+            setBugReports((prev: BugReport[]) => [{ ...row, reporter_name: p?.name ?? '알 수 없음', resolved: false }, ...prev].slice(0, 10));
           })
           .subscribe();
       }
@@ -336,6 +339,31 @@ export default function AdminDashboardPage() {
     await refreshAgendas();
   }, [supabase, refreshAgendas]);
 
+  // ── 버그 제보 모달 열기 (전체 목록 fetch) ─────────────────────────
+  const openBugModal = useCallback(async () => {
+    setShowBugModal(true);
+    setBugModalLoading(true);
+    const { data } = await supabase
+      .from('bug_reports')
+      .select('id, title, description, category, created_at, resolved, profiles!reporter_id(name)')
+      .order('created_at', { ascending: false });
+    if (data) {
+      setAllBugReports(data.map((b: any) => ({
+        ...b,
+        reporter_name: b.profiles?.name ?? '알 수 없음',
+        resolved: b.resolved ?? false,
+      })));
+    }
+    setBugModalLoading(false);
+  }, [supabase]);
+
+  // ── 버그 해결 토글 ────────────────────────────────────────────────
+  const toggleBugResolved = useCallback(async (id: string, resolved: boolean) => {
+    await supabase.from('bug_reports').update({ resolved }).eq('id', id);
+    setAllBugReports((prev: BugReport[]) => prev.map((b: BugReport) => b.id === id ? { ...b, resolved } : b));
+    setBugReports((prev: BugReport[]) => prev.map((b: BugReport) => b.id === id ? { ...b, resolved } : b));
+  }, [supabase]);
+
   if (!myProfile) {
     return (
       <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
@@ -347,6 +375,70 @@ export default function AdminDashboardPage() {
   // ── 렌더 ─────────────────────────────────────────────────────────
   return (
     <>
+      {/* 버그 제보 모달 */}
+      {showBugModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-lg mx-4 flex flex-col max-h-[80vh]">
+            <div className="flex items-center gap-2 px-6 py-4 border-b border-gray-100 dark:border-dark-border shrink-0">
+              <Bug size={16} className="text-red-primary dark:text-yellow-primary" />
+              <span className="font-bold text-gray-800 dark:text-white flex-1">버그 제보 전체 목록</span>
+              <button
+                onClick={() => setShowBugModal(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-bg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {bugModalLoading ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">로딩 중...</p>
+              ) : allBugReports.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">제보 없음</p>
+              ) : (
+                allBugReports.map((bug: BugReport) => (
+                  <div
+                    key={bug.id}
+                    className={cn(
+                      'rounded-xl border px-4 py-3 space-y-1.5 transition-all',
+                      bug.resolved
+                        ? 'bg-gray-50 dark:bg-dark-bg border-gray-100 dark:border-dark-border opacity-60'
+                        : 'bg-red-primary/5 border-red-primary/20'
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={bug.resolved}
+                        onChange={(e: { target: { checked: boolean } }) => toggleBugResolved(bug.id, e.target.checked)}
+                        className="mt-0.5 shrink-0 accent-red-primary dark:accent-yellow-primary w-4 h-4 cursor-pointer"
+                      />
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={cn('text-xs font-bold text-red-primary shrink-0', bug.resolved && 'line-through')}>
+                            [{bug.category}]
+                          </span>
+                          <span className={cn('text-sm font-semibold text-gray-800 dark:text-gray-200', bug.resolved && 'line-through')}>
+                            {bug.title}
+                          </span>
+                        </div>
+                        <p className={cn('text-xs text-gray-500 dark:text-gray-400 leading-relaxed', bug.resolved && 'line-through')}>
+                          {bug.description}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500">
+                          <span>{bug.reporter_name}</span>
+                          <span>·</span>
+                          <span>{fmt(bug.created_at)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 확인 모달 */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -458,6 +550,20 @@ export default function AdminDashboardPage() {
               <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-primary/10 text-yellow-primary font-semibold border border-yellow-primary/20">
                 Mod
               </span>
+            )}
+            {isAdmin && (
+              <button
+                onClick={openBugModal}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-red-primary/10 text-red-primary hover:bg-red-primary/20 dark:bg-yellow-primary/10 dark:text-yellow-primary dark:hover:bg-yellow-primary/20 transition-colors"
+              >
+                <Bug size={12} />
+                버그 제보
+                {bugReports.filter((b: BugReport) => !b.resolved).length > 0 && (
+                  <span className="px-1.5 py-0.5 rounded-full bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 text-xs font-bold min-w-[1.25rem] text-center leading-none">
+                    {bugReports.filter((b: BugReport) => !b.resolved).length}
+                  </span>
+                )}
+              </button>
             )}
           </div>
 
