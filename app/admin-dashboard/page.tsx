@@ -12,13 +12,19 @@ import { useOnlineUsers, type OnlineUser } from '@/components/providers/OnlineUs
 import { usePIPChat } from '@/components/providers/PIPChatContext';
 
 // ── Types ──────────────────────────────────────────────────────────
-type ChatMsg      = { id: string; content: string; is_command: boolean; created_at: string; profile_name: string };
+type ChatMsg      = { id: string; content: string; is_command: boolean; created_at: string; profile_name: string; profile_role: string };
 type AdminLog     = { id: string; action: string; detail: string | null; created_at: string; admin_name: string };
 type AgendaRow    = { id: string; title: string; category: string; is_open: boolean; yes_count: number; no_count: number; abstain_count: number; total_count: number };
 type ConfirmModal = { title: string; body: string; onConfirm: () => Promise<void> };
 type MyProfile    = { id: string; name: string; role: string };
 type AdminCall    = { id: string; caller_id: string; caller_name: string; created_at: string };
 type BugReport    = { id: string; reporter_name: string; title: string; description: string; category: string; created_at: string; resolved: boolean };
+
+const ROLE_COLOR: Record<string, string> = {
+  admin: 'text-red-primary',
+  mod:   'text-yellow-primary',
+  user:  'text-green-600 dark:text-green-400',
+};
 
 const ADMIN_COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
 const CMD_HINT: Record<string, string> = {
@@ -108,11 +114,11 @@ export default function AdminDashboardPage() {
       // 채팅 초기 로드
       const { data: chatInit } = await supabase
         .from('admin_chat')
-        .select('id, content, is_command, created_at, profiles!author_id(name)')
+        .select('id, content, is_command, created_at, profiles!author_id(name, role)')
         .order('created_at', { ascending: true })
         .limit(100);
       if (chatInit) {
-        setMessages(chatInit.map((m: any) => ({ ...m, profile_name: m.profiles?.name ?? '알 수 없음' })));
+        setMessages(chatInit.map((m: any) => ({ ...m, profile_name: m.profiles?.name ?? '알 수 없음', profile_role: m.profiles?.role ?? 'user' })));
       }
 
       // 로그 초기 로드
@@ -141,8 +147,8 @@ export default function AdminDashboardPage() {
       chatCh = supabase.channel('admin-chat-stream')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_chat' }, async (payload: { new: any }) => {
           const row = payload.new;
-          const { data: p } = await supabase.from('profiles').select('name').eq('id', row.author_id).single();
-          setMessages((prev: ChatMsg[]) => [...prev, { ...row, profile_name: p?.name ?? '알 수 없음' }]);
+          const { data: p } = await supabase.from('profiles').select('name, role').eq('id', row.author_id).single();
+          setMessages((prev: ChatMsg[]) => [...prev, { ...row, profile_name: p?.name ?? '알 수 없음', profile_role: p?.role ?? 'user' }]);
         })
         .subscribe();
 
@@ -554,7 +560,7 @@ export default function AdminDashboardPage() {
           <div className="px-4 py-3.5 border-b border-gray-200 dark:border-dark-border flex items-center gap-2 shrink-0">
             <Shield size={14} className="text-red-primary dark:text-yellow-primary" />
             <span className="text-sm font-bold text-gray-700 dark:text-gray-200">
-              {isAdmin ? 'Admin 전용 채널' : 'Staff 채널'}
+              {isAdmin ? '관리자 전용 채널' : 'Staff 채널'}
             </span>
             <span className="ml-auto text-xs text-gray-400">Private</span>
             {isMod && (
@@ -621,7 +627,7 @@ export default function AdminDashboardPage() {
                 <div className="flex items-baseline gap-2">
                   <span className={cn(
                     'text-xs font-bold',
-                    msg.is_command ? 'text-yellow-primary' : 'text-red-primary dark:text-yellow-primary'
+                    msg.is_command ? 'text-yellow-primary' : (ROLE_COLOR[msg.profile_role] ?? 'text-red-primary dark:text-yellow-primary')
                   )}>
                     {msg.profile_name}
                   </span>

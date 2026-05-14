@@ -16,6 +16,8 @@ const NAV_ITEMS = [
   { label: 'Help', href: '/help' },
 ];
 
+const STAFF_ROLES = new Set(['admin', 'mod']);
+
 type Profile = { name: string; role: string };
 
 const ROLE_BADGE: Record<string, string> = {
@@ -115,6 +117,14 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            {user && profile && STAFF_ROLES.has(profile.role) && (
+              <Link
+                href="/admin-dashboard"
+                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-primary dark:hover:text-yellow-primary transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface"
+              >
+                Dashboard
+              </Link>
+            )}
 
             {/* 로그인 / 유저 영역 */}
             {user ? (
@@ -188,6 +198,15 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            {user && profile && STAFF_ROLES.has(profile.role) && (
+              <Link
+                href="/admin-dashboard"
+                onClick={() => setMobileOpen(false)}
+                className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-primary dark:hover:text-yellow-primary rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
+              >
+                Dashboard
+              </Link>
+            )}
 
             {/* 모바일 로그인 / 로그아웃 */}
             {user ? (
