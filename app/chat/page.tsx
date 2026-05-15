@@ -5,10 +5,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Send, MessageSquare, Lock, PictureInPicture2,
-  X, Search, UserX, Users, Pencil, Paperclip, ChevronLeft,
+  X, Search, UserX, Users, Pencil, ChevronLeft,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { usePIPChat } from '@/components/providers/PIPChatContext';
+import FileDisplay from '@/components/chat/FileDisplay';
 import { useOnlineUsers } from '@/components/providers/OnlineUsersContext';
 import { cn } from '@/utils/cn';
 
@@ -63,10 +64,6 @@ const PP_BADGE: Record<string, string> = {
 };
 
 const PARTY_LEADERS: Record<string, string> = { '진보': '김동하', '보수': '정재욱', '중도': '황성연' };
-
-const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'];
-const isImageFile = (name: string) =>
-  IMAGE_EXTS.some(ext => name.toLowerCase().endsWith('.' + ext));
 
 const fmt = (ts: string) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
@@ -483,19 +480,12 @@ export default function ChatPage() {
       setUploading(false);
       return;
     }
-    // NC-2: 서명된 URL 사용 (버킷을 private으로 설정 시 필요) S
-    const { data: urlData, error: signErr } = await supabase.storage
-      .from('chat-files').createSignedUrl(data.path, 604800);
-    if (!urlData || signErr) {
-      alert('파일 URL 생성 실패: ' + (signErr?.message ?? '알 수 없는 오류'));
-      setUploading(false);
-      return;
-    }
+    // M-2: Storage 경로만 저장 — FileDisplay가 렌더 시 서명 URL 생성 S
     await supabase.from('chat_messages').insert({
       room_id:   selectedRoom.id,
       author_id: myProfile.id,
       content:   '',
-      file_url:  urlData.signedUrl,
+      file_url:  data.path,
       file_name: file.name,
     });
     setUploading(false);
@@ -786,23 +776,7 @@ export default function ChatPage() {
                         <span className="text-xs text-gray-400 dark:text-gray-500">{fmt(msg.created_at)}</span>
                       </div>
                       {msg.file_url ? (
-                        isImageFile(msg.file_name ?? '') ? (
-                          <img
-                            src={msg.file_url}
-                            alt={msg.file_name ?? '이미지'}
-                            className="max-w-xs max-h-64 rounded-xl object-contain bg-gray-100 dark:bg-dark-surface"
-                          />
-                        ) : (
-                          <a
-                            href={msg.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-surface rounded-xl text-sm text-red-primary dark:text-yellow-primary hover:underline max-w-xs"
-                          >
-                            <Paperclip size={13} />
-                            {msg.file_name ?? '파일'}
-                          </a>
-                        )
+                        <FileDisplay filePath={msg.file_url} fileName={msg.file_name} />
                       ) : (
                         <p className="text-sm bg-gray-100 dark:bg-dark-surface rounded-xl rounded-tl-sm px-3 py-2 max-w-2xl break-words text-gray-700 dark:text-gray-200">
                           {msg.content}

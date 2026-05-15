@@ -79,7 +79,7 @@ comment on table public.votes is '투표 결과 — DB Unique 제약으로 중�
 create table public.admin_chat (
   id         uuid        primary key default gen_random_uuid(),
   author_id  uuid        not null references public.profiles(id) on delete cascade,
-  content    text        not null,
+  content    text        not null check (char_length(content) <= 2000),
   is_command boolean     not null default false,
   file_url   text,        -- L-3: 파일 첨부 URL
   file_name  text,        -- L-3: 파일 원본 이름
@@ -144,11 +144,13 @@ create table public.bug_reports (
 );
 
 -- 관리자 호출
+-- C-3 fix: responder_id 추가 + 'active' 상태 추가 S
 create table public.admin_calls (
-  id         uuid        primary key default gen_random_uuid(),
-  caller_id  uuid        not null references public.profiles(id) on delete cascade,
-  status     text        not null default 'pending' check (status in ('pending', 'accepted')),
-  created_at timestamptz not null default now()
+  id           uuid        primary key default gen_random_uuid(),
+  caller_id    uuid        not null references public.profiles(id) on delete cascade,
+  responder_id uuid        references public.profiles(id) on delete set null,
+  status       text        not null default 'pending' check (status in ('pending', 'active')),
+  created_at   timestamptz not null default now()
 );
 
 
@@ -293,18 +295,24 @@ create policy "Admin/Mod 어드민 채팅 조회 가능"
   on public.admin_chat for select to authenticated
   using (public.is_mod_or_admin());
 
+-- H-3: is_command = true 는 Admin만 삽입 가능 S
 create policy "Admin/Mod 어드민 채팅 전송 가능"
   on public.admin_chat for insert to authenticated
-  with check (public.is_mod_or_admin() and auth.uid() = author_id);
+  with check (
+    public.is_mod_or_admin()
+    and auth.uid() = author_id
+    and (is_command = false or public.is_admin())
+  );
 
 -- admin_logs (Admin + Mod 조회, 생성은 Admin만)
 create policy "Admin/Mod 로그 조회 가능"
   on public.admin_logs for select to authenticated
   using (public.is_mod_or_admin());
 
+-- C-4: admin_id가 반드시 호출자 본인이어야 함 — 타 Admin 명의 허위 로그 삽입 방지 S
 create policy "Admin만 로그 생성 가능"
   on public.admin_logs for insert to authenticated
-  with check (public.is_admin());
+  with check (public.is_admin() and auth.uid() = admin_id);
 
 -- C-2: 나중에 추가된 테이블 RLS 활성화 및 정책
 alter table public.chat_rooms        enable row level security;
@@ -385,9 +393,25 @@ create policy "Admin/Mod는 버그 제보 조회 가능"
   on public.bug_reports for select to authenticated
   using (public.is_mod_or_admin());
 
-create policy "누구나 버그 제보 가능 (비로그인 포함)"
-  on public.bug_reports for insert
-  with check (true);
+-- H-5: 서버 측 Rate Limit — 5분 내 3회 초과 시 거부 S
+create or replace function public.check_bug_report_rate_limit()
+returns boolean
+language sql
+security definer
+as $$
+  select count(*) < 3
+  from public.bug_reports
+  where reporter_id = auth.uid()
+    and created_at > now() - interval '5 minutes';
+$$;
+
+create policy "로그인 사용자 버그 제보 (Rate Limit 적용)"
+  on public.bug_reports for insert to authenticated
+  with check (public.check_bug_report_rate_limit());
+
+create policy "비로그인 게스트 버그 제보 허용"
+  on public.bug_reports for insert to anon
+  with check (reporter_id is null);
 
 -- C-3 fix: Admin만 버그 제보 수정 가능 (클라이언트 UI 우회 방어) S
 create policy "Admin만 버그 제보 수정 가능"
@@ -406,6 +430,12 @@ create policy "Admin/Mod 또는 본인이 호출 조회 가능"
 create policy "인증 사용자가 관리자 호출 가능"
   on public.admin_calls for insert to authenticated
   with check (auth.uid() = caller_id and not public.is_restricted());
+
+-- C-3: Admin/Mod가 호출 상태를 active로 변경 가능 S
+create policy "Admin/Mod가 호출 수락 가능"
+  on public.admin_calls for update to authenticated
+  using (public.is_mod_or_admin())
+  with check (public.is_mod_or_admin());
 
 create policy "Admin/Mod 또는 본인이 호출 취소 가능"
   on public.admin_calls for delete to authenticated
@@ -520,6 +550,11 @@ begin
     return json_build_object('success', false, 'error', '존재하지 않는 유저입니다.');
   end if;
 
+  -- H-1(v4): Admin 계정은 kick 대상에서 제외 S
+  if (select role from public.profiles where id = p_user_id) = 'admin' then
+    return json_build_object('success', false, 'error', '다른 관리자를 강제 로그아웃할 수 없습니다.');
+  end if;
+
   insert into public.admin_logs (admin_id, action, target_user_id, detail)
   values (auth.uid(), 'kick', p_user_id, v_target_name || ' 강제 로그아웃');
 
@@ -543,6 +578,11 @@ begin
   select name into v_target_name from public.profiles where id = p_user_id;
   if not found then
     return json_build_object('success', false, 'error', '존재하지 않는 유저입니다.');
+  end if;
+
+  -- H-1(v4): Admin 계정은 ban 대상에서 제외 S
+  if (select role from public.profiles where id = p_user_id) = 'admin' then
+    return json_build_object('success', false, 'error', '다른 관리자를 차단할 수 없습니다.');
   end if;
 
   update public.profiles set is_banned = true where id = p_user_id;
@@ -573,6 +613,11 @@ begin
   select name into v_target_name from public.profiles where id = p_user_id;
   if not found then
     return json_build_object('success', false, 'error', '존재하지 않는 유저입니다.');
+  end if;
+
+  -- H-1(v4): Admin 계정은 timeout 대상에서 제외 S
+  if (select role from public.profiles where id = p_user_id) = 'admin' then
+    return json_build_object('success', false, 'error', '다른 관리자를 타임아웃할 수 없습니다.');
   end if;
 
   update public.profiles
@@ -623,6 +668,11 @@ alter publication supabase_realtime add table public.votes;
 alter publication supabase_realtime add table public.agenda_items;
 alter publication supabase_realtime add table public.admin_chat;
 alter publication supabase_realtime add table public.profiles;
+-- L-1: 신규 테이블 Realtime 활성화 S
+alter publication supabase_realtime add table public.chat_rooms;
+alter publication supabase_realtime add table public.chat_messages;
+alter publication supabase_realtime add table public.chat_room_members;
+alter publication supabase_realtime add table public.admin_calls;
 
 
 -- -----------------------------------------------------------------

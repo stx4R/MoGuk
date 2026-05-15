@@ -3,13 +3,14 @@
 // Admin/Mod 대시보드 — Admin: 풀기능 / Mod: 접속자 + 채팅 + 호출참가 S
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Users, Shield, BarChart2, Send, Plus, Paperclip,
+  Users, Shield, BarChart2, Send, Plus,
   CheckCircle2, XCircle, AlertTriangle, Bell, Bug, X,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
 import { useOnlineUsers, type OnlineUser } from '@/components/providers/OnlineUsersContext';
 import { usePIPChat } from '@/components/providers/PIPChatContext';
+import FileDisplay from '@/components/chat/FileDisplay';
 
 // ── Types ──────────────────────────────────────────────────────────
 type ChatMsg      = { id: string; content: string; is_command: boolean; created_at: string; profile_name: string; profile_role: string; file_url: string | null; file_name: string | null };
@@ -32,10 +33,6 @@ const PP_BADGE: Record<string, string> = {
   '중도':   'bg-yellow-primary/15 text-yellow-primary border border-yellow-primary/30',
   '무소속': 'bg-gray-400/15 text-gray-500 dark:text-gray-400 border border-gray-400/30',
 };
-
-const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'];
-const isImageFile = (name: string) =>
-  IMAGE_EXTS.some(ext => name.toLowerCase().endsWith('.' + ext));
 
 const ADMIN_COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
 const CMD_HINT: Record<string, string> = {
@@ -99,7 +96,6 @@ export default function AdminDashboardPage() {
   const msgPanelRef   = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const fileInputRef  = useRef<HTMLInputElement>(null);
-  const announceChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [uploading, setUploading]   = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -227,8 +223,6 @@ export default function AdminDashboardPage() {
           .subscribe();
       }
 
-      announceChRef.current = supabase.channel('global:announcements');
-      announceChRef.current.subscribe();
     }
 
     init();
@@ -237,7 +231,6 @@ export default function AdminDashboardPage() {
       if (logCh)   supabase.removeChannel(logCh);
       if (callCh)  supabase.removeChannel(callCh);
       if (bugCh)   supabase.removeChannel(bugCh);
-      if (announceChRef.current) supabase.removeChannel(announceChRef.current);
     };
   }, [supabase]);
 
@@ -298,6 +291,7 @@ export default function AdminDashboardPage() {
   }, [supabase, myProfile, setPipRoomId]);
 
   // ── 명령어 실행 (Admin 전용) ───────────────────────────────────────
+  // H-4: admin_chat 삽입은 확인 후 실행 시점에 이루어짐 (취소 시 로그 미생성) S
   const executeCommand = useCallback(async (input: string) => {
     const cmd = parseCommand(input.trim());
     if (!cmd || !myProfile || !isAdmin) return false;
@@ -327,6 +321,10 @@ export default function AdminDashboardPage() {
               type: 'broadcast', event: 'force_signout', payload: { action: 'ban' },
             });
           }
+          // H-4: 확인 후에만 chat log 기록 S
+          await supabase.from('admin_chat').insert({
+            author_id: myProfile.id, content: input.trim(), is_command: true,
+          });
         },
       });
       return true;
@@ -335,20 +333,25 @@ export default function AdminDashboardPage() {
     if (cmd.type === 'timeout') {
       const target = await getUserByName(cmd.name);
       if (!target) { alert(`"${cmd.name}" 유저를 찾을 수 없습니다.`); return false; }
-      await supabase.rpc('admin_timeout_user', { p_user_id: target.id, p_seconds: cmd.seconds });
+      const { data: res } = await supabase.rpc('admin_timeout_user', { p_user_id: target.id, p_seconds: cmd.seconds });
+      if (res && !res.success) { alert(res.error ?? '타임아웃 실패'); return true; }
+      await supabase.from('admin_chat').insert({
+        author_id: myProfile.id, content: input.trim(), is_command: true,
+      });
       return true;
     }
 
     if (cmd.type === 'announcement') {
-      await supabase.from('announcements').insert({
+      // M-4: DB 삽입 실패 시 로그/배너 미갱신 S
+      // H-2: broadcast 제거 — AnnouncementBanner는 postgres_changes 사용 S
+      const { error } = await supabase.from('announcements').insert({
         content: cmd.content,
         author: myProfile.name,
         admin_id: myProfile.id,
       });
-      await announceChRef.current?.send({
-        type: 'broadcast',
-        event: 'new_announcement',
-        payload: { id: new Date().toISOString(), content: cmd.content, author: myProfile.name, created_at: new Date().toISOString() },
+      if (error) { alert('공지 저장에 실패했습니다: ' + error.message); return true; }
+      await supabase.from('admin_chat').insert({
+        author_id: myProfile.id, content: input.trim(), is_command: true,
       });
       return true;
     }
@@ -357,6 +360,7 @@ export default function AdminDashboardPage() {
   }, [supabase, myProfile, isAdmin, getUserByName]);
 
   // ── 채팅 전송 ─────────────────────────────────────────────────────
+  // H-4: 명령어는 executeCommand에서 확인 후 삽입, 일반 메시지만 여기서 삽입 S
   const handleSend = useCallback(async (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (!chatInput.trim() || !myProfile || sending) return;
@@ -368,12 +372,15 @@ export default function AdminDashboardPage() {
       if (!isAdmin) { alert('명령어는 Admin만 사용할 수 있습니다.'); setSending(false); return; }
       const handled = await executeCommand(chatInput);
       if (!handled) { alert('올바르지 않은 명령어 형식입니다.\n예: /announcement "내용"'); setSending(false); return; }
+      setChatInput('');
+      setSending(false);
+      return; // admin_chat 삽입은 executeCommand가 담당
     }
 
     await supabase.from('admin_chat').insert({
       author_id: myProfile.id,
       content: chatInput.trim(),
-      is_command: isCmd,
+      is_command: false,
     });
 
     setChatInput('');
@@ -411,19 +418,12 @@ export default function AdminDashboardPage() {
       setUploading(false);
       return;
     }
-    // NC-2: 서명된 URL 사용 (버킷을 private으로 설정 시 필요) S
-    const { data: urlData, error: signErr } = await supabase.storage
-      .from('chat-files').createSignedUrl(data.path, 604800);
-    if (!urlData || signErr) {
-      alert('파일 URL 생성 실패: ' + (signErr?.message ?? '알 수 없는 오류'));
-      setUploading(false);
-      return;
-    }
+    // M-2: Storage 경로만 저장 — FileDisplay가 렌더 시 서명 URL 생성 S
     await supabase.from('admin_chat').insert({
       author_id:  myProfile.id,
       content:    '',
       is_command: false,
-      file_url:   urlData.signedUrl,
+      file_url:   data.path,
       file_name:  file.name,
     });
     setUploading(false);
@@ -747,23 +747,7 @@ export default function AdminDashboardPage() {
                   )}
                 </div>
                 {msg.file_url ? (
-                  isImageFile(msg.file_name ?? '') ? (
-                    <img
-                      src={msg.file_url}
-                      alt={msg.file_name ?? '이미지'}
-                      className="max-w-xs max-h-64 rounded-xl object-contain bg-gray-100 dark:bg-dark-surface"
-                    />
-                  ) : (
-                    <a
-                      href={msg.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-surface rounded-xl text-sm text-red-primary dark:text-yellow-primary hover:underline max-w-xs"
-                    >
-                      <Paperclip size={13} />
-                      {msg.file_name ?? '파일'}
-                    </a>
-                  )
+                  <FileDisplay filePath={msg.file_url} fileName={msg.file_name} />
                 ) : (
                   <p className={cn(
                     'text-sm rounded-xl rounded-tl-sm px-3 py-2 max-w-lg',
