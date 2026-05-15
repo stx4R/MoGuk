@@ -269,10 +269,18 @@ export default function ChatPage() {
         })
         .on('broadcast', { event: 'kick' }, ({ payload }: { payload: { user_id: string } }) => {
           if (payload.user_id === myUserIdRef.current) {
-            setSelectedRoom(null);
-            setMessages([]);
-            setMobileView('rooms');
-            alert('채팅방에서 강제 퇴장되었습니다.');
+            // H-4 fix: DB에서 실제 멤버십 제거 여부 확인 후 처리 (broadcast 위조 방어) S
+            const roomId = selectedRoom!.id;
+            supabase.from('chat_room_members')
+              .select('user_id').eq('room_id', roomId).eq('user_id', myUserIdRef.current!).single()
+              .then(({ data }) => {
+                if (!data) {
+                  setSelectedRoom(null);
+                  setMessages([]);
+                  setMobileView('rooms');
+                  alert('채팅방에서 강제 퇴장되었습니다.');
+                }
+              });
           } else {
             setRoomMembers(prev => prev.filter(m => m.user_id !== payload.user_id));
           }
@@ -356,6 +364,10 @@ export default function ChatPage() {
     if (trimmed === '/end' && selectedRoom.is_support) {
       const rank = ROLE_RANK[myProfile.role] ?? 0;
       if (rank >= 1) {
+        // M-2 fix: 클라이언트 상태 조작 방어 — DB에서 is_support 재확인 S
+        const { data: roomCheck } = await supabase
+          .from('chat_rooms').select('is_support').eq('id', selectedRoom.id).single();
+        if (!roomCheck?.is_support) { setInput(''); return; }
         await supabase.from('chat_messages').insert({
           room_id: selectedRoom.id, author_id: myProfile.id,
           content: '관리자가 지원을 종료했습니다.', is_system: true,
@@ -376,6 +388,12 @@ export default function ChatPage() {
       const targetMember = roomMembers.find(m => m.name === targetName);
       if (!targetMember) {
         alert(`'${targetName}' 사용자를 채팅방 멤버에서 찾을 수 없습니다.`);
+        setInput('');
+        return;
+      }
+      // H-5 fix: Admin은 kick 불가 (권한 역전 방지) S
+      if (targetMember.role === 'admin') {
+        alert('Admin 사용자는 강제 퇴장할 수 없습니다.');
         setInput('');
         return;
       }

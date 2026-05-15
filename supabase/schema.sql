@@ -98,6 +98,59 @@ create table public.admin_logs (
 );
 comment on table public.admin_logs is '관리자 액션 감사 로그';
 
+-- 채팅방 (C-2: 나중에 추가된 테이블 — RLS 필수)
+create table public.chat_rooms (
+  id           uuid        primary key default gen_random_uuid(),
+  name         text        not null,
+  icon         text,
+  is_public    boolean     not null default false,
+  is_support   boolean     not null default false,
+  is_global    boolean     not null default false,
+  party_tag    text,
+  announcement text,
+  created_by   uuid        references public.profiles(id) on delete set null,
+  created_at   timestamptz not null default now()
+);
+
+-- 채팅 메시지
+create table public.chat_messages (
+  id         uuid        primary key default gen_random_uuid(),
+  room_id    uuid        not null references public.chat_rooms(id) on delete cascade,
+  author_id  uuid        not null references public.profiles(id) on delete cascade,
+  content    text        not null default '',
+  file_url   text,
+  file_name  text,
+  is_system  boolean     not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- 채팅방 멤버
+create table public.chat_room_members (
+  room_id    uuid not null references public.chat_rooms(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  joined_at  timestamptz not null default now(),
+  primary key (room_id, user_id)
+);
+
+-- 버그 제보
+create table public.bug_reports (
+  id          uuid        primary key default gen_random_uuid(),
+  reporter_id uuid        references public.profiles(id) on delete set null,
+  title       text        not null,
+  description text        not null,
+  category    text        not null default '기타',
+  resolved    boolean     not null default false,
+  created_at  timestamptz not null default now()
+);
+
+-- 관리자 호출
+create table public.admin_calls (
+  id         uuid        primary key default gen_random_uuid(),
+  caller_id  uuid        not null references public.profiles(id) on delete cascade,
+  status     text        not null default 'pending' check (status in ('pending', 'accepted')),
+  created_at timestamptz not null default now()
+);
+
 
 -- -----------------------------------------------------------------
 -- 2. Trigger — Auth 회원가입 시 profiles 자동 생성
@@ -252,6 +305,109 @@ create policy "Admin/Mod 로그 조회 가능"
 create policy "Admin만 로그 생성 가능"
   on public.admin_logs for insert to authenticated
   with check (public.is_admin());
+
+-- C-2: 나중에 추가된 테이블 RLS 활성화 및 정책
+alter table public.chat_rooms        enable row level security;
+alter table public.chat_messages     enable row level security;
+alter table public.chat_room_members enable row level security;
+alter table public.bug_reports       enable row level security;
+alter table public.admin_calls       enable row level security;
+
+-- chat_rooms
+create policy "공개 채팅방 또는 멤버만 조회 가능"
+  on public.chat_rooms for select to authenticated
+  using (
+    is_public = true
+    or auth.uid() = created_by
+    or exists (select 1 from public.chat_room_members where room_id = id and user_id = auth.uid())
+  );
+
+create policy "인증 사용자가 일반 채팅방 생성 가능"
+  on public.chat_rooms for insert to authenticated
+  with check (not public.is_restricted() and is_global = false and party_tag is null);
+
+-- H-3 fix: 개설자 또는 Admin만 채팅방 수정 가능 (클라이언트 isCreator 체크 우회 방어) S
+create policy "개설자 또는 Admin만 채팅방 수정 가능"
+  on public.chat_rooms for update to authenticated
+  using (auth.uid() = created_by or public.is_admin());
+
+create policy "개설자 또는 Admin만 채팅방 삭제 가능"
+  on public.chat_rooms for delete to authenticated
+  using (auth.uid() = created_by or public.is_admin());
+
+-- chat_messages
+create policy "방 멤버는 메시지 조회 가능"
+  on public.chat_messages for select to authenticated
+  using (
+    exists (
+      select 1 from public.chat_rooms cr
+      left join public.chat_room_members crm on crm.room_id = cr.id and crm.user_id = auth.uid()
+      where cr.id = room_id and (cr.is_public = true or crm.user_id is not null)
+    )
+  );
+
+create policy "방 멤버이고 미차단 상태면 메시지 전송 가능"
+  on public.chat_messages for insert to authenticated
+  with check (
+    auth.uid() = author_id
+    and not public.is_restricted()
+    and exists (select 1 from public.chat_room_members where room_id = chat_messages.room_id and user_id = auth.uid())
+    and (
+      not exists (select 1 from public.chat_rooms where id = room_id and is_global = true)
+      or public.is_admin()
+    )
+  );
+
+-- chat_room_members
+create policy "방 멤버 또는 공개방이면 멤버 목록 조회 가능"
+  on public.chat_room_members for select to authenticated
+  using (
+    exists (select 1 from public.chat_room_members m2 where m2.room_id = room_id and m2.user_id = auth.uid())
+    or exists (select 1 from public.chat_rooms where id = room_id and is_public = true)
+  );
+
+create policy "본인 가입만 허용"
+  on public.chat_room_members for insert to authenticated
+  with check (auth.uid() = user_id and not public.is_restricted());
+
+create policy "본인 탈퇴 또는 개설자/Admin이 멤버 제거 가능"
+  on public.chat_room_members for delete to authenticated
+  using (
+    auth.uid() = user_id
+    or public.is_admin()
+    or exists (select 1 from public.chat_rooms where id = room_id and created_by = auth.uid())
+  );
+
+-- bug_reports
+create policy "Admin/Mod는 버그 제보 조회 가능"
+  on public.bug_reports for select to authenticated
+  using (public.is_mod_or_admin());
+
+create policy "누구나 버그 제보 가능 (비로그인 포함)"
+  on public.bug_reports for insert
+  with check (true);
+
+-- C-3 fix: Admin만 버그 제보 수정 가능 (클라이언트 UI 우회 방어) S
+create policy "Admin만 버그 제보 수정 가능"
+  on public.bug_reports for update to authenticated
+  using (public.is_admin());
+
+create policy "Admin만 버그 제보 삭제 가능"
+  on public.bug_reports for delete to authenticated
+  using (public.is_admin());
+
+-- admin_calls
+create policy "Admin/Mod 또는 본인이 호출 조회 가능"
+  on public.admin_calls for select to authenticated
+  using (public.is_mod_or_admin() or auth.uid() = caller_id);
+
+create policy "인증 사용자가 관리자 호출 가능"
+  on public.admin_calls for insert to authenticated
+  with check (auth.uid() = caller_id and not public.is_restricted());
+
+create policy "Admin/Mod 또는 본인이 호출 취소 가능"
+  on public.admin_calls for delete to authenticated
+  using (public.is_mod_or_admin() or auth.uid() = caller_id);
 
 
 -- -----------------------------------------------------------------
