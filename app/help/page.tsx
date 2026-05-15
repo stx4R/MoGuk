@@ -1,8 +1,7 @@
 'use client';
 
-// Help 페이지 — 관리자 호출 + 버그 제보 S
+// Help 페이지 — 관리자 호출 + 버그 제보 (비로그인 게스트 접근 허용) S
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { Phone, PhoneOff, CheckCircle2, Bug, Send, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { usePIPChat } from '@/components/providers/PIPChatContext';
@@ -13,7 +12,6 @@ type CallStatus = 'idle' | 'waiting' | 'connected';
 const BUG_CATEGORIES = ['UI/디자인', '기능 오류', '성능', '접근 불가', '기타'];
 
 export default function HelpPage() {
-  const router = useRouter();
   const supabase = useRef(createClient()).current;
   const { setPipRoomId } = usePIPChat();
 
@@ -34,7 +32,10 @@ export default function HelpPage() {
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) {
+        setMyName('Guest');
+        return;
+      }
       setMyId(user.id);
 
       const { data: prof } = await supabase
@@ -54,11 +55,15 @@ export default function HelpPage() {
     return () => {
       if (signalChRef.current) supabase.removeChannel(signalChRef.current);
     };
-  }, [supabase, router, setPipRoomId]);
+  }, [supabase, setPipRoomId]);
 
   // ── 관리자 호출 ───────────────────────────────────────────────────
   const handleCall = async () => {
-    if (!myId || callStatus !== 'idle') return;
+    if (callStatus !== 'idle') return;
+    if (!myId) {
+      alert('관리자 호출을 이용하려면 로그인이 필요합니다.');
+      return;
+    }
     setCallStatus('waiting');
 
     const { data } = await supabase
@@ -81,7 +86,7 @@ export default function HelpPage() {
   // ── 버그 제보 ─────────────────────────────────────────────────────
   const handleBugSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!bugTitle.trim() || !bugDesc.trim() || !myId || bugSending) return;
+    if (!bugTitle.trim() || !bugDesc.trim() || bugSending) return;
     setBugSending(true);
 
     await supabase.from('bug_reports').insert({

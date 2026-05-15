@@ -3,7 +3,7 @@
 // Admin/Mod 대시보드 — Admin: 풀기능 / Mod: 접속자 + 채팅 + 호출참가 S
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Users, Shield, BarChart2, Send,
+  Users, Shield, BarChart2, Send, Plus, Paperclip,
   CheckCircle2, XCircle, AlertTriangle, Bell, Bug, X,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -12,7 +12,7 @@ import { useOnlineUsers, type OnlineUser } from '@/components/providers/OnlineUs
 import { usePIPChat } from '@/components/providers/PIPChatContext';
 
 // ── Types ──────────────────────────────────────────────────────────
-type ChatMsg      = { id: string; content: string; is_command: boolean; created_at: string; profile_name: string; profile_role: string };
+type ChatMsg      = { id: string; content: string; is_command: boolean; created_at: string; profile_name: string; profile_role: string; file_url: string | null; file_name: string | null };
 type AdminLog     = { id: string; action: string; detail: string | null; created_at: string; admin_name: string };
 type AgendaRow    = { id: string; title: string; category: string; is_open: boolean; yes_count: number; no_count: number; abstain_count: number; total_count: number };
 type ConfirmModal = { title: string; body: string; onConfirm: () => Promise<void> };
@@ -25,6 +25,17 @@ const ROLE_COLOR: Record<string, string> = {
   mod:   'text-yellow-primary',
   user:  'text-green-600 dark:text-green-400',
 };
+
+const PP_BADGE: Record<string, string> = {
+  '진보':   'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  '보수':   'bg-red-primary/15 text-red-primary border border-red-primary/30',
+  '중도':   'bg-yellow-primary/15 text-yellow-primary border border-yellow-primary/30',
+  '무소속': 'bg-gray-400/15 text-gray-500 dark:text-gray-400 border border-gray-400/30',
+};
+
+const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'];
+const isImageFile = (name: string) =>
+  IMAGE_EXTS.some(ext => name.toLowerCase().endsWith('.' + ext));
 
 const ADMIN_COMMANDS = ['/kick', '/ban', '/timeout', '/announcement'];
 const CMD_HINT: Record<string, string> = {
@@ -71,7 +82,10 @@ export default function AdminDashboardPage() {
   const [sending, setSending]               = useState(false);
   const msgPanelRef   = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
+  const fileInputRef  = useRef<HTMLInputElement>(null);
   const announceChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [uploading, setUploading]   = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const isAdmin = myProfile?.role === 'admin';
   const isMod   = myProfile?.role === 'mod';
@@ -114,11 +128,11 @@ export default function AdminDashboardPage() {
       // 채팅 초기 로드
       const { data: chatInit } = await supabase
         .from('admin_chat')
-        .select('id, content, is_command, created_at, profiles!author_id(name, role)')
+        .select('id, content, is_command, created_at, file_url, file_name, profiles!author_id(name, role)')
         .order('created_at', { ascending: true })
         .limit(100);
       if (chatInit) {
-        setMessages(chatInit.map((m: any) => ({ ...m, profile_name: m.profiles?.name ?? '알 수 없음', profile_role: m.profiles?.role ?? 'user' })));
+        setMessages(chatInit.map((m: any) => ({ ...m, profile_name: m.profiles?.name ?? '알 수 없음', profile_role: m.profiles?.role ?? 'user', file_url: m.file_url ?? null, file_name: m.file_name ?? null })));
       }
 
       // 로그 초기 로드
@@ -148,7 +162,7 @@ export default function AdminDashboardPage() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'admin_chat' }, async (payload: { new: any }) => {
           const row = payload.new;
           const { data: p } = await supabase.from('profiles').select('name, role').eq('id', row.author_id).single();
-          setMessages((prev: ChatMsg[]) => [...prev, { ...row, profile_name: p?.name ?? '알 수 없음', profile_role: p?.role ?? 'user' }]);
+          setMessages((prev: ChatMsg[]) => [...prev, { ...row, profile_name: p?.name ?? '알 수 없음', profile_role: p?.role ?? 'user', file_url: row.file_url ?? null, file_name: row.file_name ?? null }]);
         })
         .subscribe();
 
@@ -350,6 +364,29 @@ export default function AdminDashboardPage() {
     setSending(false);
   }, [chatInput, myProfile, sending, isAdmin, executeCommand, supabase]);
 
+  // ── 파일 업로드 (Admin Chat) ──────────────────────────────────────
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!myProfile || uploading) return;
+    setUploading(true);
+    const path = `admin-chat/${Date.now()}_${file.name}`;
+    const { data, error } = await supabase.storage
+      .from('chat-files').upload(path, file, { upsert: true });
+    if (!data || error) {
+      alert('파일 업로드 실패: ' + (error?.message ?? '알 수 없는 오류'));
+      setUploading(false);
+      return;
+    }
+    const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(data.path);
+    await supabase.from('admin_chat').insert({
+      author_id:  myProfile.id,
+      content:    '',
+      is_command: false,
+      file_url:   urlData.publicUrl,
+      file_name:  file.name,
+    });
+    setUploading(false);
+  }, [supabase, myProfile, uploading]);
+
   // ── 안건 개폐 ─────────────────────────────────────────────────────
   const toggleAgenda = useCallback(async (id: string, open: boolean) => {
     await supabase.rpc('admin_toggle_agenda', { p_agenda_id: id, p_open: open });
@@ -518,6 +555,9 @@ export default function AdminDashboardPage() {
                           <div key={u.user_id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white dark:hover:bg-dark-bg transition-colors">
                             <span className="w-2 h-2 rounded-full bg-red-primary shrink-0" />
                             <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">{u.name}</span>
+                            <span className={cn('px-1.5 py-0.5 rounded-full text-xs font-bold shrink-0', PP_BADGE[u.pp] ?? PP_BADGE['무소속'])}>
+                              {u.pp}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -531,6 +571,9 @@ export default function AdminDashboardPage() {
                           <div key={u.user_id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white dark:hover:bg-dark-bg transition-colors">
                             <span className="w-2 h-2 rounded-full bg-yellow-primary shrink-0" />
                             <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">{u.name}</span>
+                            <span className={cn('px-1.5 py-0.5 rounded-full text-xs font-bold shrink-0', PP_BADGE[u.pp] ?? PP_BADGE['무소속'])}>
+                              {u.pp}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -544,6 +587,9 @@ export default function AdminDashboardPage() {
                           <div key={u.user_id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white dark:hover:bg-dark-bg transition-colors">
                             <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
                             <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">{u.name}</span>
+                            <span className={cn('px-1.5 py-0.5 rounded-full text-xs font-bold shrink-0', PP_BADGE[u.pp] ?? PP_BADGE['무소속'])}>
+                              {u.pp}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -621,7 +667,29 @@ export default function AdminDashboardPage() {
           )}
 
           {/* 메시지 목록 */}
-          <div ref={msgPanelRef} onScroll={handleMsgScroll} className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div
+            ref={msgPanelRef}
+            onScroll={handleMsgScroll}
+            onDragOver={(e: any) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={(e: any) => {
+              e.preventDefault();
+              setIsDragging(false);
+              const file = e.dataTransfer?.files?.[0];
+              if (file) handleFileUpload(file);
+            }}
+            className={cn(
+              'flex-1 overflow-y-auto p-4 space-y-3 relative transition-all',
+              isDragging && 'ring-2 ring-inset ring-red-primary dark:ring-yellow-primary'
+            )}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 flex items-center justify-center bg-red-primary/5 dark:bg-yellow-primary/5 pointer-events-none z-10 rounded">
+                <p className="text-sm font-semibold text-red-primary dark:text-yellow-primary">
+                  파일을 여기에 놓으세요
+                </p>
+              </div>
+            )}
             {messages.map((msg) => (
               <div key={msg.id} className="flex flex-col gap-0.5">
                 <div className="flex items-baseline gap-2">
@@ -636,14 +704,34 @@ export default function AdminDashboardPage() {
                     <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-primary/10 text-yellow-primary font-mono">CMD</span>
                   )}
                 </div>
-                <p className={cn(
-                  'text-sm rounded-xl rounded-tl-sm px-3 py-2 max-w-lg',
-                  msg.is_command
-                    ? 'bg-yellow-primary/10 text-yellow-primary font-mono'
-                    : 'bg-gray-100 dark:bg-dark-surface text-gray-700 dark:text-gray-200'
-                )}>
-                  {msg.content}
-                </p>
+                {msg.file_url ? (
+                  isImageFile(msg.file_name ?? '') ? (
+                    <img
+                      src={msg.file_url}
+                      alt={msg.file_name ?? '이미지'}
+                      className="max-w-xs max-h-64 rounded-xl object-contain bg-gray-100 dark:bg-dark-surface"
+                    />
+                  ) : (
+                    <a
+                      href={msg.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-surface rounded-xl text-sm text-red-primary dark:text-yellow-primary hover:underline max-w-xs"
+                    >
+                      <Paperclip size={13} />
+                      {msg.file_name ?? '파일'}
+                    </a>
+                  )
+                ) : (
+                  <p className={cn(
+                    'text-sm rounded-xl rounded-tl-sm px-3 py-2 max-w-lg',
+                    msg.is_command
+                      ? 'bg-yellow-primary/10 text-yellow-primary font-mono'
+                      : 'bg-gray-100 dark:bg-dark-surface text-gray-700 dark:text-gray-200'
+                  )}>
+                    {msg.content}
+                  </p>
+                )}
               </div>
             ))}
           </div>
@@ -665,7 +753,26 @@ export default function AdminDashboardPage() {
           )}
 
           {/* 입력창 */}
-          <form onSubmit={handleSend} className="p-3 border-t border-gray-200 dark:border-dark-border flex gap-2 shrink-0">
+          <form onSubmit={handleSend} className="p-3 border-t border-gray-200 dark:border-dark-border flex gap-2 shrink-0 items-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e: any) => {
+                const f = e.target.files?.[0];
+                if (f) handleFileUpload(f);
+                e.target.value = '';
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              title="파일 첨부"
+              className="p-2.5 rounded-xl text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors disabled:opacity-40 shrink-0"
+            >
+              <Plus size={16} />
+            </button>
             <input
               value={chatInput}
               onChange={(e) => {
@@ -673,12 +780,13 @@ export default function AdminDashboardPage() {
                 setShowCmds(isAdmin && e.target.value.startsWith('/'));
               }}
               onKeyDown={(e) => { if (e.key === 'Escape') setShowCmds(false); }}
-              placeholder={isAdmin ? '메시지 또는 /명령어 "인자"' : '메시지를 입력하세요...'}
-              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
+              placeholder={uploading ? '파일 업로드 중...' : isAdmin ? '메시지 또는 /명령어 "인자"' : '메시지를 입력하세요...'}
+              disabled={uploading}
+              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors disabled:opacity-60"
             />
             <button
               type="submit"
-              disabled={!chatInput.trim() || sending}
+              disabled={!chatInput.trim() || sending || uploading}
               className="px-4 py-2.5 rounded-xl bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 hover:bg-red-hover dark:hover:bg-yellow-hover transition-colors disabled:opacity-40"
             >
               <Send size={15} />

@@ -18,7 +18,7 @@ const NAV_ITEMS = [
 
 const STAFF_ROLES = new Set(['admin', 'mod']);
 
-type Profile = { name: string; role: string };
+type Profile = { name: string; role: string; pp: string };
 
 const ROLE_BADGE: Record<string, string> = {
   admin: 'bg-red-primary/10 text-red-primary border border-red-primary/30',
@@ -30,6 +30,13 @@ const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
   mod:   'Mod',
   user:  'User',
+};
+
+const PP_BADGE: Record<string, string> = {
+  '진보':   'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  '보수':   'bg-red-primary/15 text-red-primary border border-red-primary/30',
+  '중도':   'bg-yellow-primary/15 text-yellow-primary border border-yellow-primary/30',
+  '무소속': 'bg-gray-400/15 text-gray-500 dark:text-gray-400 border border-gray-400/30',
 };
 
 export default function Header() {
@@ -52,7 +59,7 @@ export default function Header() {
     async function fetchProfile(userId: string) {
       const { data } = await supabase
         .from('profiles')
-        .select('name, role')
+        .select('name, role, pp')
         .eq('id', userId)
         .single();
       if (data) setProfile(data as Profile);
@@ -131,9 +138,14 @@ export default function Header() {
               <div className="flex items-center gap-2 ml-1 pl-3 border-l border-gray-200 dark:border-dark-border">
                 <div className="flex items-center gap-1.5">
                   {profile && (
-                    <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold', badgeClass)}>
-                      {badgeLabel}
-                    </span>
+                    <>
+                      <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold', PP_BADGE[profile.pp] ?? PP_BADGE['무소속'])}>
+                        {profile.pp}
+                      </span>
+                      <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold', badgeClass)}>
+                        {badgeLabel}
+                      </span>
+                    </>
                   )}
                   <span className="text-sm text-gray-700 dark:text-gray-300">{displayName}</span>
                 </div>
@@ -212,9 +224,14 @@ export default function Header() {
             {user ? (
               <div className="flex items-center gap-2 px-4 py-3 rounded-lg">
                 {profile && (
-                  <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0', badgeClass)}>
-                    {badgeLabel}
-                  </span>
+                  <>
+                    <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0', PP_BADGE[profile.pp] ?? PP_BADGE['무소속'])}>
+                      {profile.pp}
+                    </span>
+                    <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0', badgeClass)}>
+                      {badgeLabel}
+                    </span>
+                  </>
                 )}
                 <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">{displayName}</span>
                 <button

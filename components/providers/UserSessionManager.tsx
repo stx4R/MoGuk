@@ -1,6 +1,6 @@
 'use client';
 
-// 인증된 유저 공통 — 강제퇴장 감지 + Presence 등록 (role 포함) + 전체 접속자 Context 동기화 S
+// 인증된 유저 공통 — 강제퇴장 감지 + Presence 등록 (role, pp 포함) + 전체 접속자 Context 동기화 S
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -21,7 +21,7 @@ export default function UserSessionManager() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, role, is_banned')
+        .select('name, role, is_banned, pp')
         .eq('id', user.id)
         .single();
 
@@ -33,7 +33,7 @@ export default function UserSessionManager() {
 
       if (!profile) return;
 
-      // Presence 채널 — role 포함 추적, sync 이벤트로 Context 갱신 S
+      // Presence 채널 — role, pp 포함 추적, sync 이벤트로 Context 갱신 S
       presenceChannel = supabase.channel('online-users', {
         config: { presence: { key: user.id } },
       });
@@ -52,6 +52,7 @@ export default function UserSessionManager() {
               user_id:   user.id,
               name:      profile.name,
               role:      profile.role ?? 'user',
+              pp:        profile.pp   ?? '무소속',
               online_at: new Date().toISOString(),
             });
           }

@@ -27,6 +27,7 @@ type Message = {
   author_id: string;
   author_name: string;
   author_role: string;
+  author_pp: string;
   content: string;
   created_at: string;
   file_url: string | null;
@@ -35,7 +36,7 @@ type Message = {
 
 type MyProfile = { id: string; name: string; role: string };
 type SearchUser = { id: string; name: string; role: string };
-type RoomMember = { user_id: string; name: string; role: string };
+type RoomMember = { user_id: string; name: string; role: string; pp: string };
 
 const ROLE_RANK: Record<string, number> = { admin: 2, mod: 1, user: 0 };
 const ROLE_LABEL: Record<string, string> = { admin: 'Admin', mod: 'Mod', user: 'User' };
@@ -48,6 +49,13 @@ const ROLE_BADGE: Record<string, string> = {
   admin: 'bg-red-primary/10 text-red-primary border border-red-primary/30',
   mod:   'bg-yellow-primary/10 text-yellow-primary border border-yellow-primary/30',
   user:  'bg-green-400/10 text-green-600 dark:text-green-400 border border-green-400/30',
+};
+
+const PP_BADGE: Record<string, string> = {
+  '진보':   'bg-blue-500/15 text-blue-400 border border-blue-500/30',
+  '보수':   'bg-red-primary/15 text-red-primary border border-red-primary/30',
+  '중도':   'bg-yellow-primary/15 text-yellow-primary border border-yellow-primary/30',
+  '무소속': 'bg-gray-400/15 text-gray-500 dark:text-gray-400 border border-gray-400/30',
 };
 
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'];
@@ -159,7 +167,7 @@ export default function ChatPage() {
     async function load() {
       const { data: msgs } = await supabase
         .from('chat_messages')
-        .select('id, author_id, content, created_at, file_url, file_name, profiles!author_id(name, role)')
+        .select('id, author_id, content, created_at, file_url, file_name, profiles!author_id(name, role, pp)')
         .eq('room_id', selectedRoom!.id)
         .order('created_at', { ascending: true })
         .limit(100);
@@ -168,6 +176,7 @@ export default function ChatPage() {
           ...m,
           author_name: m.profiles?.name ?? '알 수 없음',
           author_role: m.profiles?.role ?? 'user',
+          author_pp:   m.profiles?.pp   ?? '무소속',
           file_url:    m.file_url  ?? null,
           file_name:   m.file_name ?? null,
         })));
@@ -180,11 +189,12 @@ export default function ChatPage() {
           filter: `room_id=eq.${selectedRoom!.id}`,
         }, async (payload: { new: any }) => {
           const row = payload.new as any;
-          const { data: p } = await supabase.from('profiles').select('name, role').eq('id', row.author_id).single();
+          const { data: p } = await supabase.from('profiles').select('name, role, pp').eq('id', row.author_id).single();
           setMessages((prev: Message[]) => [...prev, {
             ...row,
             author_name: p?.name  ?? '알 수 없음',
             author_role: p?.role  ?? 'user',
+            author_pp:   (p as any)?.pp ?? '무소속',
             file_url:    row.file_url  ?? null,
             file_name:   row.file_name ?? null,
           }]);
@@ -215,13 +225,14 @@ export default function ChatPage() {
   const loadRoomMembers = useCallback(async (roomId: string) => {
     const { data } = await supabase
       .from('chat_room_members')
-      .select('user_id, profiles!user_id(name, role)')
+      .select('user_id, profiles!user_id(name, role, pp)')
       .eq('room_id', roomId);
     if (data) {
       setRoomMembers(data.map((m: any) => ({
         user_id: m.user_id,
         name:    m.profiles?.name ?? '알 수 없음',
         role:    m.profiles?.role ?? 'user',
+        pp:      m.profiles?.pp   ?? '무소속',
       })));
     }
   }, [supabase]);
@@ -510,9 +521,12 @@ export default function ChatPage() {
                 )}
                 {messages.map(msg => (
                   <div key={msg.id} className="flex flex-col gap-0.5">
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span className={cn('text-xs font-bold', ROLE_COLOR[msg.author_role] ?? ROLE_COLOR.user)}>
                         [{ROLE_LABEL[msg.author_role] ?? msg.author_role}] {msg.author_name}
+                      </span>
+                      <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold', PP_BADGE[msg.author_pp] ?? PP_BADGE['무소속'])}>
+                        {msg.author_pp}
                       </span>
                       <span className="text-xs text-gray-400 dark:text-gray-500">{fmt(msg.created_at)}</span>
                     </div>
@@ -579,9 +593,12 @@ export default function ChatPage() {
                                     'w-2 h-2 rounded-full shrink-0 animate-pulse',
                                     isOnline ? 'bg-green-400' : 'bg-red-400'
                                   )} />
-                                  <span className={cn('text-xs flex-1 truncate', ROLE_COLOR[m.role] ?? ROLE_COLOR.user)}>
+                                  <span className={cn('text-xs truncate', ROLE_COLOR[m.role] ?? ROLE_COLOR.user)}>
                                     {selectedRoom.created_by === m.user_id && '👑 '}
                                     {m.name}
+                                  </span>
+                                  <span className={cn('px-1.5 py-0.5 rounded-full text-xs font-bold shrink-0', PP_BADGE[m.pp] ?? PP_BADGE['무소속'])}>
+                                    {m.pp}
                                   </span>
                                 </div>
                               );
