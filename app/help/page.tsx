@@ -26,7 +26,8 @@ export default function HelpPage() {
   const [bugSending, setBugSending]   = useState(false);
   const [bugSent, setBugSent]         = useState(false);
 
-  const signalChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const signalChRef      = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const bugRateLimitRef  = useRef<number[]>([]);
 
   // ── 초기화 ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -43,8 +44,17 @@ export default function HelpPage() {
       if (prof) setMyName(prof.name);
 
       // 지원 연결 신호 수신 채널
+      // NH-1 fix: DB에서 멤버십 검증 후 PIP 오픈 S
       signalChRef.current = supabase.channel(`support-signal:${user.id}`)
-        .on('broadcast', { event: 'support_ready' }, ({ payload }: { payload: { room_id: string } }) => {
+        .on('broadcast', { event: 'support_ready' }, async ({ payload }: { payload: { room_id: string } }) => {
+          if (!payload?.room_id || typeof payload.room_id !== 'string') return;
+          const { data: membership } = await supabase
+            .from('chat_room_members')
+            .select('user_id')
+            .eq('room_id', payload.room_id)
+            .eq('user_id', user.id)
+            .single();
+          if (!membership) return;
           setCallStatus('connected');
           setPipRoomId(payload.room_id);
         })
@@ -87,8 +97,21 @@ export default function HelpPage() {
   const handleBugSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bugTitle.trim() || !bugDesc.trim() || bugSending) return;
-    setBugSending(true);
 
+    // NC-1 fix: 제목/설명 길이 제한 S
+    if (bugTitle.trim().length > 100)  { alert('제목은 100자 이하여야 합니다.'); return; }
+    if (bugDesc.trim().length  > 2000) { alert('설명은 2000자 이하여야 합니다.'); return; }
+
+    // NC-1 fix: 클라이언트 측 제출 빈도 제한 (5분 내 3회) S
+    const now = Date.now();
+    bugRateLimitRef.current = bugRateLimitRef.current.filter(t => now - t < 5 * 60 * 1000);
+    if (bugRateLimitRef.current.length >= 3) {
+      alert('5분 내 버그 제보 횟수를 초과했습니다. 잠시 후 다시 시도하세요.');
+      return;
+    }
+    bugRateLimitRef.current.push(now);
+
+    setBugSending(true);
     await supabase.from('bug_reports').insert({
       reporter_id: myId,
       title: bugTitle.trim(),
@@ -207,6 +230,7 @@ export default function HelpPage() {
               value={bugTitle}
               onChange={e => setBugTitle(e.target.value)}
               placeholder="버그 제목을 간략하게 입력하세요"
+              maxLength={100}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
             />
           </div>
@@ -219,6 +243,7 @@ export default function HelpPage() {
               onChange={e => setBugDesc(e.target.value)}
               placeholder="어떤 상황에서 발생했는지, 어떤 동작을 기대했는지 설명해 주세요."
               rows={5}
+              maxLength={2000}
               className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors resize-none"
             />
           </div>

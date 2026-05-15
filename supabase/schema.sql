@@ -346,11 +346,13 @@ create policy "방 멤버는 메시지 조회 가능"
     )
   );
 
+-- NH-3: is_system 필드는 Admin만 설정 가능 S
 create policy "방 멤버이고 미차단 상태면 메시지 전송 가능"
   on public.chat_messages for insert to authenticated
   with check (
     auth.uid() = author_id
     and not public.is_restricted()
+    and (is_system = false or public.is_admin())
     and exists (select 1 from public.chat_room_members where room_id = chat_messages.room_id and user_id = auth.uid())
     and (
       not exists (select 1 from public.chat_rooms where id = room_id and is_global = true)
@@ -408,6 +410,11 @@ create policy "인증 사용자가 관리자 호출 가능"
 create policy "Admin/Mod 또는 본인이 호출 취소 가능"
   on public.admin_calls for delete to authenticated
   using (public.is_mod_or_admin() or auth.uid() = caller_id);
+
+-- NH-2: 사용자당 pending 호출 1개 제한 S
+create unique index if not exists admin_calls_one_pending_per_user
+  on public.admin_calls (caller_id)
+  where status = 'pending';
 
 
 -- -----------------------------------------------------------------

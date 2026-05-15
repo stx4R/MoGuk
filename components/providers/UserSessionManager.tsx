@@ -65,7 +65,10 @@ export default function UserSessionManager() {
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           if (!currentUser) {
             await supabase.auth.signOut();
-            router.push(`/login?reason=${payload?.action ?? 'kicked'}`);
+            // NM-4 fix: reason 파라미터 화이트리스트 검증 — XSS/Open-Redirect 방지 S
+            const VALID_REASONS = new Set(['kicked', 'banned', 'timeout']);
+            const safeReason = VALID_REASONS.has(payload?.action) ? payload.action : 'kicked';
+            router.push(`/login?reason=${safeReason}`);
           }
           // 세션이 유효하면 브로드캐스트 위조 — 무시
         })

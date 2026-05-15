@@ -71,6 +71,22 @@ const isImageFile = (name: string) =>
 const fmt = (ts: string) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
+// NM-3: 파일 매직 바이트 검증 S
+async function checkMagicBytes(file: File): Promise<boolean> {
+  const buf   = await file.slice(0, 12).arrayBuffer();
+  const b     = new Uint8Array(buf);
+  const type  = file.type;
+  if (type === 'image/jpeg')       return b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF;
+  if (type === 'image/png')        return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47;
+  if (type === 'image/gif')        return b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46;
+  if (type === 'image/webp')       return b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46
+                                       && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50;
+  if (type === 'image/avif')       return b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70;
+  if (type === 'application/pdf')  return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
+  if (type === 'text/plain')       return true;
+  return false;
+}
+
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────
 export default function ChatPage() {
   const router           = useRouter();
@@ -453,6 +469,11 @@ export default function ChatPage() {
       alert('허용되지 않는 파일 형식입니다. (이미지, PDF, TXT만 가능)');
       return;
     }
+    // NM-3: 매직 바이트 검증 S
+    if (!await checkMagicBytes(file)) {
+      alert('파일 내용이 확장자와 일치하지 않습니다.');
+      return;
+    }
     setUploading(true);
     const path = `${selectedRoom.id}/${Date.now()}_${file.name}`;
     const { data, error } = await supabase.storage
@@ -462,12 +483,19 @@ export default function ChatPage() {
       setUploading(false);
       return;
     }
-    const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(data.path);
+    // NC-2: 서명된 URL 사용 (버킷을 private으로 설정 시 필요) S
+    const { data: urlData, error: signErr } = await supabase.storage
+      .from('chat-files').createSignedUrl(data.path, 604800);
+    if (!urlData || signErr) {
+      alert('파일 URL 생성 실패: ' + (signErr?.message ?? '알 수 없는 오류'));
+      setUploading(false);
+      return;
+    }
     await supabase.from('chat_messages').insert({
       room_id:   selectedRoom.id,
       author_id: myProfile.id,
       content:   '',
-      file_url:  urlData.publicUrl,
+      file_url:  urlData.signedUrl,
       file_name: file.name,
     });
     setUploading(false);
@@ -882,6 +910,7 @@ export default function ChatPage() {
                     '메시지를 입력하세요...'
                   }
                   disabled={uploading}
+                  maxLength={2000}
                   className="flex-1 min-w-0 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors disabled:opacity-60"
                 />
                 <button
@@ -949,6 +978,7 @@ export default function ChatPage() {
               <input
                 value={editRoomName}
                 onChange={e => setEditRoomName(e.target.value)}
+                maxLength={50}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
               />
             </div>
@@ -995,6 +1025,7 @@ export default function ChatPage() {
                 value={newRoomName}
                 onChange={e => setNewRoomName(e.target.value)}
                 placeholder="채팅방 이름을 입력하세요"
+                maxLength={50}
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
               />
             </div>
