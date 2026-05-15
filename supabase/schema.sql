@@ -228,6 +228,21 @@ as $$
 $$;
 
 
+-- 무한 재귀 방지: RLS 없이 멤버십 확인 (SECURITY DEFINER) S
+create or replace function public.is_room_member(p_room_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.chat_room_members
+    where room_id = p_room_id and user_id = auth.uid()
+  );
+$$;
+
+
 -- -----------------------------------------------------------------
 -- 4. Row Level Security (RLS)
 -- -----------------------------------------------------------------
@@ -321,13 +336,13 @@ alter table public.chat_room_members enable row level security;
 alter table public.bug_reports       enable row level security;
 alter table public.admin_calls       enable row level security;
 
--- chat_rooms
+-- chat_rooms — is_room_member() SECURITY DEFINER로 재귀 방지 S
 create policy "공개 채팅방 또는 멤버만 조회 가능"
   on public.chat_rooms for select to authenticated
   using (
     is_public = true
     or auth.uid() = created_by
-    or exists (select 1 from public.chat_room_members where room_id = id and user_id = auth.uid())
+    or public.is_room_member(id)
   );
 
 create policy "인증 사용자가 일반 채팅방 생성 가능"
@@ -343,15 +358,12 @@ create policy "개설자 또는 Admin만 채팅방 삭제 가능"
   on public.chat_rooms for delete to authenticated
   using (auth.uid() = created_by or public.is_admin());
 
--- chat_messages
+-- chat_messages — JOIN 방식 재귀 제거, is_room_member() 사용 S
 create policy "방 멤버는 메시지 조회 가능"
   on public.chat_messages for select to authenticated
   using (
-    exists (
-      select 1 from public.chat_rooms cr
-      left join public.chat_room_members crm on crm.room_id = cr.id and crm.user_id = auth.uid()
-      where cr.id = room_id and (cr.is_public = true or crm.user_id is not null)
-    )
+    public.is_room_member(room_id)
+    or exists (select 1 from public.chat_rooms where id = room_id and is_public = true)
   );
 
 -- NH-3: is_system 필드는 Admin만 설정 가능 S
@@ -368,12 +380,12 @@ create policy "방 멤버이고 미차단 상태면 메시지 전송 가능"
     )
   );
 
--- chat_room_members
+-- chat_room_members — 자기 참조 제거, SECURITY DEFINER 함수 사용 S
 create policy "방 멤버 또는 공개방이면 멤버 목록 조회 가능"
   on public.chat_room_members for select to authenticated
   using (
-    exists (select 1 from public.chat_room_members m2 where m2.room_id = room_id and m2.user_id = auth.uid())
-    or exists (select 1 from public.chat_rooms where id = room_id and is_public = true)
+    user_id = auth.uid()
+    or public.is_room_member(room_id)
   );
 
 create policy "본인 가입만 허용"
