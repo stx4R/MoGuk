@@ -52,7 +52,7 @@ function parseCommand(input: string) {
   const ann     = input.match(/^\/announcement\s+"(.+)"$/);
   if (kick)    return { type: 'kick'         as const, name: kick[1] };
   if (ban)     return { type: 'ban'          as const, name: ban[1] };
-  if (timeout) return { type: 'timeout'      as const, name: timeout[1], seconds: parseInt(timeout[2]) };
+  if (timeout) return { type: 'timeout'      as const, name: timeout[1], seconds: Math.min(parseInt(timeout[2]), 86400) };
   if (ann)     return { type: 'announcement' as const, content: ann[1] };
   return null;
 }
@@ -365,8 +365,23 @@ export default function AdminDashboardPage() {
   }, [chatInput, myProfile, sending, isAdmin, executeCommand, supabase]);
 
   // ── 파일 업로드 (Admin Chat) ──────────────────────────────────────
+  const UPLOAD_MAX_BYTES  = 10 * 1024 * 1024; // 10 MB
+  const UPLOAD_MIME_ALLOW = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'application/pdf', 'text/plain',
+  ]);
+
   const handleFileUpload = useCallback(async (file: File) => {
     if (!myProfile || uploading) return;
+    // M-5 fix: 파일 크기 및 타입 검증 S
+    if (file.size > UPLOAD_MAX_BYTES) {
+      alert('파일 크기는 10MB 이하여야 합니다.');
+      return;
+    }
+    if (!UPLOAD_MIME_ALLOW.has(file.type)) {
+      alert('허용되지 않는 파일 형식입니다. (이미지, PDF, TXT만 가능)');
+      return;
+    }
     setUploading(true);
     const path = `admin-chat/${Date.now()}_${file.name}`;
     const { data, error } = await supabase.storage

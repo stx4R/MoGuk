@@ -17,9 +17,11 @@ create extension if not exists "uuid-ossp";
 -- 사용자 프로필 (Supabase Auth 연동)
 create table public.profiles (
   id            uuid        primary key references auth.users(id) on delete cascade,
-  name          text        not null,
+  name          text        not null unique,  -- H-3: 이름 중복 가입 방지
   role          text        not null default 'user'
                             check (role in ('admin', 'mod', 'user')),
+  pp            text        not null default '무소속'
+                            check (pp in ('진보', '보수', '중도', '무소속')),
   club          text,
   is_banned     boolean     not null default false,
   timeout_until timestamptz,
@@ -79,6 +81,8 @@ create table public.admin_chat (
   author_id  uuid        not null references public.profiles(id) on delete cascade,
   content    text        not null,
   is_command boolean     not null default false,
+  file_url   text,        -- L-3: 파일 첨부 URL
+  file_name  text,        -- L-3: 파일 원본 이름
   created_at timestamptz not null default now()
 );
 comment on table public.admin_chat is 'Admin 전용 내부 채팅';
@@ -105,11 +109,12 @@ security definer
 set search_path = public
 as $$
 begin
+  -- H-2 fix: role은 항상 'user'로 고정 — 메타데이터로 권한 상승 불가 S
   insert into public.profiles (id, name, role)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    coalesce(new.raw_user_meta_data->>'role', 'user')
+    'user'
   );
   return new;
 end;

@@ -59,10 +59,15 @@ export default function UserSessionManager() {
         });
 
       // 강제 퇴장/차단 신호 수신 채널 S
+      // H-1 fix: broadcast 수신 후 getUser()로 서버 검증 — 세션이 실제로 무효화된 경우에만 처리 S
       kickChannel = supabase.channel(`user-control:${user.id}`)
         .on('broadcast', { event: 'force_signout' }, async ({ payload }) => {
-          await supabase.auth.signOut();
-          router.push(`/login?reason=${payload?.action ?? 'kicked'}`);
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          if (!currentUser) {
+            await supabase.auth.signOut();
+            router.push(`/login?reason=${payload?.action ?? 'kicked'}`);
+          }
+          // 세션이 유효하면 브로드캐스트 위조 — 무시
         })
         .subscribe();
     }

@@ -40,14 +40,18 @@ export default function AnnouncementBanner() {
         timer = setTimeout(() => setAnnouncement(null), remaining);
       }
 
-      // Broadcast 채널 구독 — role 무관 모든 로그인 사용자에게 즉시 전달 S
+      // H-1 fix: broadcast 대신 postgres_changes 사용 — RLS로 DB 삽입이 Admin만 가능하므로 위조 불가 S
       const channel = supabase
         .channel('global:announcements')
-        .on('broadcast', { event: 'new_announcement' }, (payload) => {
-          const data = payload.payload as Announcement;
-          setAnnouncement(data);
+        .on('postgres_changes', {
+          event: 'INSERT', schema: 'public', table: 'announcements',
+        }, (payload) => {
+          const data = payload.new as any;
+          if (!data || new Date(data.expires_at) <= new Date()) return;
+          setAnnouncement(data as Announcement);
           clearTimeout(timer);
-          timer = setTimeout(() => setAnnouncement(null), 120_000);
+          const remaining = new Date(data.expires_at).getTime() - Date.now();
+          timer = setTimeout(() => setAnnouncement(null), remaining);
         })
         .subscribe();
 

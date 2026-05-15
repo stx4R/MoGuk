@@ -419,8 +419,22 @@ export default function ChatPage() {
   }, [input, myProfile, selectedRoom, sending, supabase, loadRooms, roomMembers]);
 
   // ── 파일 업로드 ─────────────────────────────────────────────────
+  const UPLOAD_MAX_BYTES  = 10 * 1024 * 1024;
+  const UPLOAD_MIME_ALLOW = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+    'application/pdf', 'text/plain',
+  ]);
+
   const handleFileUpload = useCallback(async (file: File) => {
     if (!myProfile || !selectedRoom || uploading) return;
+    if (file.size > UPLOAD_MAX_BYTES) {
+      alert('파일 크기는 10MB 이하여야 합니다.');
+      return;
+    }
+    if (!UPLOAD_MIME_ALLOW.has(file.type)) {
+      alert('허용되지 않는 파일 형식입니다. (이미지, PDF, TXT만 가능)');
+      return;
+    }
     setUploading(true);
     const path = `${selectedRoom.id}/${Date.now()}_${file.name}`;
     const { data, error } = await supabase.storage

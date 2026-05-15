@@ -2,7 +2,33 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+// M-1 fix: IP별 간단 rate limiting (서버리스 단일 인스턴스 내 best-effort) S
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT     = 5;
+const RATE_WINDOW_MS = 60_000;
+
+function checkRateLimit(ip: string): boolean {
+  const now   = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT) return false;
+  entry.count++;
+  return true;
+}
+
 export async function POST(request: Request) {
+  // Rate limit check
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
+      { status: 429 }
+    );
+  }
+
   const body = await request.json() as { email?: string; password?: string; name?: string };
   const { email, password, name } = body;
 
@@ -41,16 +67,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '이미 사용 중인 이름입니다.' }, { status: 409 });
   }
 
-  // 3. 이미 가입된 이메일인지 확인 (createUser 에러보다 먼저 명시적으로 차단)
-  const { data: existingUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  const emailTaken = existingUsers?.users?.some(
-    (u) => u.email?.toLowerCase() === email.toLowerCase()
-  );
-  if (emailTaken) {
-    return NextResponse.json({ error: '이미 사용 중인 이메일입니다.' }, { status: 409 });
-  }
-
-  // 4. 계정 생성 (이메일 인증 즉시 완료 처리)
+  // 3. 계정 생성 — createUser가 이메일 중복을 에러로 반환하므로 listUsers() 불필요 S
   const { error: createError } = await admin.auth.admin.createUser({
     email,
     password,
