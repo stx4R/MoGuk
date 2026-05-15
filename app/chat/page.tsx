@@ -1,11 +1,11 @@
 'use client';
 
-// 채팅 페이지 — 방 목록(좌) + 실시간 채팅(우) + 멤버 패널 + 파일 첨부 + 방 편집 S
+// 채팅 페이지 — 방 목록(좌) + 실시간 채팅(우) + 멤버 패널 + 파일 첨부 + 방 편집 + 특수방 + 킥/공지 S
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Send, MessageSquare, Lock, PictureInPicture2,
-  X, Search, UserX, Users, Pencil, Paperclip,
+  X, Search, UserX, Users, Pencil, Paperclip, ChevronLeft,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { usePIPChat } from '@/components/providers/PIPChatContext';
@@ -20,6 +20,9 @@ type Room = {
   is_support: boolean;
   is_member: boolean;
   created_by: string | null;
+  is_global: boolean;
+  party_tag: string | null;
+  announcement: string | null;
 };
 
 type Message = {
@@ -32,9 +35,10 @@ type Message = {
   created_at: string;
   file_url: string | null;
   file_name: string | null;
+  is_system: boolean;
 };
 
-type MyProfile = { id: string; name: string; role: string };
+type MyProfile = { id: string; name: string; role: string; pp: string };
 type SearchUser = { id: string; name: string; role: string };
 type RoomMember = { user_id: string; name: string; role: string; pp: string };
 
@@ -58,6 +62,8 @@ const PP_BADGE: Record<string, string> = {
   '무소속': 'bg-gray-400/15 text-gray-500 dark:text-gray-400 border border-gray-400/30',
 };
 
+const PARTY_LEADERS: Record<string, string> = { '진보': '김동하', '보수': '정재욱', '중도': '황성연' };
+
 const IMAGE_EXTS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'avif'];
 const isImageFile = (name: string) =>
   IMAGE_EXTS.some(ext => name.toLowerCase().endsWith('.' + ext));
@@ -67,8 +73,8 @@ const fmt = (ts: string) =>
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────
 export default function ChatPage() {
-  const router      = useRouter();
-  const supabase    = useRef(createClient()).current;
+  const router           = useRouter();
+  const supabase         = useRef(createClient()).current;
   const { setPipRoomId } = usePIPChat();
   const { onlineUsers }  = useOnlineUsers();
 
@@ -80,6 +86,8 @@ export default function ChatPage() {
   const [sending, setSending]             = useState(false);
   const [uploading, setUploading]         = useState(false);
   const [isDragging, setIsDragging]       = useState(false);
+  const [mobileView, setMobileView]       = useState<'rooms' | 'chat'>('rooms');
+  const [announcementPopup, setAnnouncementPopup] = useState(false);
 
   // 방 생성 모달
   const [showCreate, setShowCreate]       = useState(false);
@@ -101,6 +109,8 @@ export default function ChatPage() {
   const msgPanelRef   = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const fileInputRef  = useRef<HTMLInputElement>(null);
+  const msgChRef      = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const myUserIdRef   = useRef<string | null>(null);
 
   // ── 스크롤 제어 ─────────────────────────────────────────────────
   useEffect(() => {
@@ -121,20 +131,36 @@ export default function ChatPage() {
     isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
   }, []);
 
-  // ── 초기 로드 ───────────────────────────────────────────────────
-  useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
-      const { data: prof } = await supabase
-        .from('profiles').select('id, name, role').eq('id', user.id).single();
-      if (!prof) return;
-      setMyProfile(prof as MyProfile);
-      await loadRooms(user.id);
+  // ── 특수방 자동 멤버십 ───────────────────────────────────────────
+  const ensureSpecialMembership = useCallback(async (
+    userId: string, userName: string, userPp: string
+  ) => {
+    // 전체 공지방 자동 가입
+    const { data: globalRoom } = await supabase
+      .from('chat_rooms').select('id').eq('is_global', true).single();
+    if (globalRoom) {
+      await supabase.from('chat_room_members')
+        .insert({ room_id: globalRoom.id, user_id: userId });
+      // duplicate key error is expected and safe to ignore
     }
-    init();
-  }, [supabase, router]);
 
+    // 정당별 채팅방 자동 가입
+    if (userPp && userPp !== '무소속') {
+      const { data: partyRoom } = await supabase
+        .from('chat_rooms').select('id, created_by').eq('party_tag', userPp).single();
+      if (partyRoom) {
+        await supabase.from('chat_room_members')
+          .insert({ room_id: partyRoom.id, user_id: userId });
+        // 정당 개설자 자동 설정 (미등록 상태였다가 처음 가입 시)
+        if (!partyRoom.created_by && userName === PARTY_LEADERS[userPp]) {
+          await supabase.from('chat_rooms')
+            .update({ created_by: userId }).eq('id', partyRoom.id);
+        }
+      }
+    }
+  }, [supabase]);
+
+  // ── 방 목록 로드 ─────────────────────────────────────────────────
   const loadRooms = useCallback(async (userId: string) => {
     const { data: memberRows } = await supabase
       .from('chat_room_members').select('room_id').eq('user_id', userId);
@@ -142,21 +168,60 @@ export default function ChatPage() {
 
     const { data: publicRooms } = await supabase
       .from('chat_rooms')
-      .select('id, name, icon, is_support, created_by')
+      .select('id, name, icon, is_support, created_by, is_global, party_tag, announcement')
       .eq('is_public', true).order('created_at');
 
-    const { data: privateRooms } = await supabase
-      .from('chat_rooms')
-      .select('id, name, icon, is_support, created_by')
-      .eq('is_public', false)
-      .in('id', Array.from(memberRoomIds)).order('created_at');
+    const memberIdArray = Array.from(memberRoomIds);
+    let privateRoomsData: any[] = [];
+    if (memberIdArray.length > 0) {
+      const { data } = await supabase
+        .from('chat_rooms')
+        .select('id, name, icon, is_support, created_by, is_global, party_tag, announcement')
+        .eq('is_public', false)
+        .in('id', memberIdArray)
+        .order('created_at');
+      privateRoomsData = data ?? [];
+    }
+
+    const toRoom = (r: any, isMember: boolean): Room => ({
+      id: r.id, name: r.name,
+      icon: r.icon ?? null,
+      is_support: r.is_support ?? false,
+      created_by: r.created_by ?? null,
+      is_global: r.is_global ?? false,
+      party_tag: r.party_tag ?? null,
+      announcement: r.announcement ?? null,
+      is_member: isMember,
+    });
 
     const combined = [
-      ...(publicRooms ?? []).map((r: any) => ({ ...r, icon: r.icon ?? null, created_by: r.created_by ?? null, is_member: memberRoomIds.has(r.id) })),
-      ...(privateRooms ?? []).map((r: any) => ({ ...r, icon: r.icon ?? null, created_by: r.created_by ?? null, is_member: true })),
+      ...(publicRooms ?? []).map((r: any) => toRoom(r, memberRoomIds.has(r.id))),
+      ...privateRoomsData.map((r: any) => toRoom(r, true)),
     ];
-    setRooms(combined as Room[]);
+    setRooms(combined);
   }, [supabase]);
+
+  // ── 초기 로드 (onAuthStateChange로 로그인 루프 방지) ─────────────
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event !== 'INITIAL_SESSION') return;
+        if (!session) { router.push('/login'); return; }
+
+        myUserIdRef.current = session.user.id;
+        const { data: prof } = await supabase
+          .from('profiles').select('id, name, role, pp')
+          .eq('id', session.user.id).single();
+        if (!prof) return;
+        setMyProfile(prof as MyProfile);
+        await ensureSpecialMembership(
+          session.user.id, (prof as any).name, (prof as any).pp ?? '무소속'
+        );
+        await loadRooms(session.user.id);
+      }
+    );
+    return () => subscription.unsubscribe();
+  }, [supabase, router, ensureSpecialMembership, loadRooms]);
 
   // ── 방 선택 → 메시지 로드 + 실시간 구독 ────────────────────────
   useEffect(() => {
@@ -167,7 +232,7 @@ export default function ChatPage() {
     async function load() {
       const { data: msgs } = await supabase
         .from('chat_messages')
-        .select('id, author_id, content, created_at, file_url, file_name, profiles!author_id(name, role, pp)')
+        .select('id, author_id, content, created_at, file_url, file_name, is_system, profiles!author_id(name, role, pp)')
         .eq('room_id', selectedRoom!.id)
         .order('created_at', { ascending: true })
         .limit(100);
@@ -179,17 +244,19 @@ export default function ChatPage() {
           author_pp:   m.profiles?.pp   ?? '무소속',
           file_url:    m.file_url  ?? null,
           file_name:   m.file_name ?? null,
+          is_system:   m.is_system ?? false,
         })));
       }
 
-      // 채팅 메시지 실시간
+      // 채팅 메시지 실시간 + 킥/공지 브로드캐스트
       msgCh = supabase.channel(`chat-room:${selectedRoom!.id}`)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'chat_messages',
           filter: `room_id=eq.${selectedRoom!.id}`,
         }, async (payload: { new: any }) => {
           const row = payload.new as any;
-          const { data: p } = await supabase.from('profiles').select('name, role, pp').eq('id', row.author_id).single();
+          const { data: p } = await supabase
+            .from('profiles').select('name, role, pp').eq('id', row.author_id).single();
           setMessages((prev: Message[]) => [...prev, {
             ...row,
             author_name: p?.name  ?? '알 수 없음',
@@ -197,25 +264,48 @@ export default function ChatPage() {
             author_pp:   (p as any)?.pp ?? '무소속',
             file_url:    row.file_url  ?? null,
             file_name:   row.file_name ?? null,
+            is_system:   row.is_system ?? false,
           }]);
+        })
+        .on('broadcast', { event: 'kick' }, ({ payload }: { payload: { user_id: string } }) => {
+          if (payload.user_id === myUserIdRef.current) {
+            setSelectedRoom(null);
+            setMessages([]);
+            setMobileView('rooms');
+            alert('채팅방에서 강제 퇴장되었습니다.');
+          } else {
+            setRoomMembers(prev => prev.filter(m => m.user_id !== payload.user_id));
+          }
+        })
+        .on('broadcast', { event: 'announcement_update' }, ({ payload }: { payload: { text: string } }) => {
+          setSelectedRoom(prev => prev ? { ...prev, announcement: payload.text } : null);
         })
         .subscribe();
 
-      // 방 이름/아이콘 변경 실시간
+      msgChRef.current = msgCh;
+
+      // 방 이름/아이콘/공지 변경 실시간
       roomCh = supabase.channel(`chat-room-meta:${selectedRoom!.id}`)
         .on('postgres_changes', {
           event: 'UPDATE', schema: 'public', table: 'chat_rooms',
           filter: `id=eq.${selectedRoom!.id}`,
         }, (payload: { new: any }) => {
           const u = payload.new;
-          setSelectedRoom(prev => prev ? { ...prev, name: u.name, icon: u.icon ?? null } : null);
-          setRooms(prev => prev.map(r => r.id === u.id ? { ...r, name: u.name, icon: u.icon ?? null } : r));
+          setSelectedRoom(prev => prev
+            ? { ...prev, name: u.name, icon: u.icon ?? null, announcement: u.announcement ?? null }
+            : null
+          );
+          setRooms(prev => prev.map(r => r.id === u.id
+            ? { ...r, name: u.name, icon: u.icon ?? null, announcement: u.announcement ?? null }
+            : r
+          ));
         })
         .subscribe();
     }
 
     load();
     return () => {
+      msgChRef.current = null;
       if (msgCh)  supabase.removeChannel(msgCh);
       if (roomCh) supabase.removeChannel(roomCh);
     };
@@ -242,19 +332,28 @@ export default function ChatPage() {
     if (!myProfile) return;
     if (!room.is_member) {
       await supabase.from('chat_room_members').insert({ room_id: room.id, user_id: myProfile.id });
-      setRooms((prev: Room[]) => prev.map((r: Room) => r.id === room.id ? { ...r, is_member: true } : r));
+      setRooms((prev: Room[]) => prev.map((r: Room) =>
+        r.id === room.id ? { ...r, is_member: true } : r
+      ));
     }
     setSelectedRoom({ ...room, is_member: true });
     setMessages([]);
     setShowMembers(false);
-  }, [supabase, myProfile]);
+    setMobileView('chat');
+    setAnnouncementPopup(false);
+    await loadRoomMembers(room.id);
+  }, [supabase, myProfile, loadRoomMembers]);
 
   // ── 메시지 전송 ─────────────────────────────────────────────────
   const handleSend = useCallback(async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    if (!input.trim() || !myProfile || !selectedRoom || sending) return;
+    const trimmed = input.trim();
+    if (!trimmed || !myProfile || !selectedRoom || sending) return;
 
-    if (input.trim() === '/end' && selectedRoom.is_support) {
+    const _isCreator = selectedRoom.created_by === myProfile.id;
+
+    // /end 커맨드 (지원방 종료, Mod 이상)
+    if (trimmed === '/end' && selectedRoom.is_support) {
       const rank = ROLE_RANK[myProfile.role] ?? 0;
       if (rank >= 1) {
         await supabase.from('chat_messages').insert({
@@ -264,21 +363,60 @@ export default function ChatPage() {
         await supabase.from('chat_rooms').delete().eq('id', selectedRoom.id);
         setSelectedRoom(null);
         setMessages([]);
-        if (myProfile) await loadRooms(myProfile.id);
+        setMobileView('rooms');
+        await loadRooms(myProfile.id);
         setInput('');
         return;
       }
+    }
+
+    // /kick 커맨드 (개설자 전용)
+    if (trimmed.startsWith('/kick ') && _isCreator) {
+      const targetName = trimmed.slice(6).trim();
+      const targetMember = roomMembers.find(m => m.name === targetName);
+      if (!targetMember) {
+        alert(`'${targetName}' 사용자를 채팅방 멤버에서 찾을 수 없습니다.`);
+        setInput('');
+        return;
+      }
+      await supabase.from('chat_room_members').delete()
+        .eq('room_id', selectedRoom.id).eq('user_id', targetMember.user_id);
+      await msgChRef.current?.send({
+        type: 'broadcast', event: 'kick',
+        payload: { user_id: targetMember.user_id },
+      });
+      await supabase.from('chat_messages').insert({
+        room_id: selectedRoom.id, author_id: myProfile.id,
+        content: `${targetName}님이 강제 퇴장되었습니다.`, is_system: true,
+      });
+      setRoomMembers(prev => prev.filter(m => m.user_id !== targetMember.user_id));
+      setInput('');
+      return;
+    }
+
+    // /announcement 커맨드 (개설자 전용)
+    if (trimmed.startsWith('/announcement ') && _isCreator) {
+      const text = trimmed.slice(14).trim();
+      if (!text) { setInput(''); return; }
+      await supabase.from('chat_rooms').update({ announcement: text }).eq('id', selectedRoom.id);
+      await msgChRef.current?.send({
+        type: 'broadcast', event: 'announcement_update',
+        payload: { text },
+      });
+      setSelectedRoom(prev => prev ? { ...prev, announcement: text } : null);
+      setInput('');
+      return;
     }
 
     setSending(true);
     await supabase.from('chat_messages').insert({
       room_id: selectedRoom.id,
       author_id: myProfile.id,
-      content: input.trim(),
+      content: trimmed,
     });
     setInput('');
     setSending(false);
-  }, [input, myProfile, selectedRoom, sending, supabase, loadRooms]);
+  }, [input, myProfile, selectedRoom, sending, supabase, loadRooms, roomMembers]);
 
   // ── 파일 업로드 ─────────────────────────────────────────────────
   const handleFileUpload = useCallback(async (file: File) => {
@@ -309,7 +447,6 @@ export default function ChatPage() {
     const newName = editRoomName.trim();
     const newIcon = editRoomIcon.trim() || null;
     await supabase.from('chat_rooms').update({ name: newName, icon: newIcon }).eq('id', selectedRoom.id);
-    // 옵티미스틱 업데이트 — realtime이 나머지 구독자 업데이트
     setSelectedRoom(prev => prev ? { ...prev, name: newName, icon: newIcon } : null);
     setRooms(prev => prev.map(r => r.id === selectedRoom.id ? { ...r, name: newName, icon: newIcon } : r));
     setEditingRoom(false);
@@ -356,7 +493,15 @@ export default function ChatPage() {
       setCreating(false);
       return;
     }
-    const newRoom: Room = { ...room, is_member: true, icon: room.icon ?? null, created_by: room.created_by ?? null };
+    const newRoom: Room = {
+      ...room,
+      is_member: true,
+      icon: room.icon ?? null,
+      created_by: room.created_by ?? null,
+      is_global: false,
+      party_tag: null,
+      announcement: null,
+    };
     setRooms(prev => [...prev, newRoom]);
     setSelectedRoom(newRoom);
     setMessages([]);
@@ -365,12 +510,14 @@ export default function ChatPage() {
     setInviteList([]);
     setSearchQuery('');
     setCreating(false);
+    setMobileView('chat');
   }, [newRoomName, myProfile, inviteList, creating, supabase]);
 
   // ── 파생값 ──────────────────────────────────────────────────────
-  const myRank      = ROLE_RANK[myProfile?.role ?? 'user'] ?? 0;
-  const isCreator   = !!myProfile && selectedRoom?.created_by === myProfile.id;
-  const onlineIds   = new Set(onlineUsers.map(u => u.user_id));
+  const myRank     = ROLE_RANK[myProfile?.role ?? 'user'] ?? 0;
+  const isCreator  = !!myProfile && selectedRoom?.created_by === myProfile.id;
+  const onlineIds  = new Set(onlineUsers.map(u => u.user_id));
+  const isReadOnly = (selectedRoom?.is_global === true) && myProfile?.role !== 'admin';
 
   const adminMembers = roomMembers.filter(m => m.role === 'admin');
   const modMembers   = roomMembers.filter(m => m.role === 'mod');
@@ -381,7 +528,11 @@ export default function ChatPage() {
     <div className="h-[calc(100vh-4rem)] flex overflow-hidden">
 
       {/* ── 좌측: 방 목록 ─────────────────────────────────────────── */}
-      <aside className="w-64 shrink-0 border-r border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface flex flex-col max-md:hidden">
+      <aside className={cn(
+        'shrink-0 border-r border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface flex flex-col',
+        'md:w-64',
+        mobileView === 'rooms' ? 'w-full flex' : 'hidden md:flex',
+      )}>
         <div className="px-4 py-3.5 border-b border-gray-200 dark:border-dark-border flex items-center gap-2 shrink-0">
           <MessageSquare size={14} className="text-red-primary dark:text-yellow-primary" />
           <span className="text-sm font-bold text-gray-700 dark:text-gray-200 flex-1">채팅방</span>
@@ -435,22 +586,45 @@ export default function ChatPage() {
       </aside>
 
       {/* ── 우측: 채팅 영역 ────────────────────────────────────────── */}
-      <section className="flex-1 flex flex-col min-w-0">
+      <section className={cn(
+        'flex-1 flex flex-col min-w-0',
+        mobileView === 'chat' ? 'flex' : 'hidden md:flex',
+      )}>
         {selectedRoom ? (
           <>
             {/* 헤더 */}
-            <div className="px-4 py-3.5 border-b border-gray-200 dark:border-dark-border flex items-center gap-2 shrink-0 bg-white dark:bg-dark-bg">
+            <div className="px-3 py-3.5 border-b border-gray-200 dark:border-dark-border flex items-center gap-1.5 shrink-0 bg-white dark:bg-dark-bg">
+              {/* 모바일 뒤로가기 */}
+              <button
+                onClick={() => setMobileView('rooms')}
+                className="md:hidden p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors shrink-0"
+              >
+                <ChevronLeft size={18} />
+              </button>
               {selectedRoom.icon ? (
                 <span className="text-base shrink-0 leading-none">{selectedRoom.icon}</span>
               ) : (
-                <MessageSquare size={14} className="text-red-primary dark:text-yellow-primary" />
+                <MessageSquare size={14} className="text-red-primary dark:text-yellow-primary shrink-0" />
               )}
-              <span className="text-sm font-bold text-gray-700 dark:text-gray-200 flex-1 truncate">
+              <span className="text-sm font-bold text-gray-700 dark:text-gray-200 flex-1 truncate min-w-0">
                 {selectedRoom.name}
               </span>
               {selectedRoom.is_support && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-primary/10 text-yellow-primary border border-yellow-primary/20 font-medium shrink-0">
-                  지원 채팅
+                  지원
+                </span>
+              )}
+              {selectedRoom.is_global && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-medium shrink-0">
+                  전체
+                </span>
+              )}
+              {selectedRoom.party_tag && (
+                <span className={cn(
+                  'text-xs px-2 py-0.5 rounded-full font-medium shrink-0',
+                  PP_BADGE[selectedRoom.party_tag] ?? PP_BADGE['무소속']
+                )}>
+                  {selectedRoom.party_tag}
                 </span>
               )}
               {/* 방 편집 (개설자만) */}
@@ -462,7 +636,7 @@ export default function ChatPage() {
                     setEditingRoom(true);
                   }}
                   title="채팅방 편집"
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors shrink-0"
                 >
                   <Pencil size={14} />
                 </button>
@@ -476,7 +650,7 @@ export default function ChatPage() {
                 }}
                 title="채팅방 멤버"
                 className={cn(
-                  'p-1.5 rounded-lg transition-colors',
+                  'p-1.5 rounded-lg transition-colors shrink-0',
                   showMembers
                     ? 'text-red-primary dark:text-yellow-primary bg-gray-100 dark:bg-dark-surface'
                     : 'text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface'
@@ -488,11 +662,25 @@ export default function ChatPage() {
               <button
                 onClick={() => setPipRoomId(selectedRoom.id)}
                 title="PIP 모드로 열기"
-                className="p-1.5 rounded-lg text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors"
+                className="p-1.5 rounded-lg text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors shrink-0"
               >
                 <PictureInPicture2 size={15} />
               </button>
             </div>
+
+            {/* 공지 고정 바 */}
+            {selectedRoom.announcement && (
+              <button
+                onClick={() => setAnnouncementPopup(true)}
+                className="w-full px-4 py-2 bg-yellow-primary/10 border-b border-yellow-primary/20 flex items-center gap-2 shrink-0 hover:bg-yellow-primary/15 transition-colors text-left"
+              >
+                <span className="text-xs shrink-0">📌</span>
+                <p className="text-xs font-medium text-yellow-primary dark:text-yellow-primary flex-1 truncate">
+                  {selectedRoom.announcement}
+                </p>
+                <span className="text-xs text-gray-400 shrink-0">클릭하여 보기</span>
+              </button>
+            )}
 
             <div className="flex flex-1 min-h-0">
               {/* 메시지 패널 (드래그&드롭 지원) */}
@@ -520,46 +708,54 @@ export default function ChatPage() {
                   </div>
                 )}
                 {messages.map(msg => (
-                  <div key={msg.id} className="flex flex-col gap-0.5">
-                    <div className="flex items-baseline gap-1.5 flex-wrap">
-                      <span className={cn('text-xs font-bold', ROLE_COLOR[msg.author_role] ?? ROLE_COLOR.user)}>
-                        [{ROLE_LABEL[msg.author_role] ?? msg.author_role}] {msg.author_name}
-                      </span>
-                      <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold', PP_BADGE[msg.author_pp] ?? PP_BADGE['무소속'])}>
-                        {msg.author_pp}
-                      </span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{fmt(msg.created_at)}</span>
-                    </div>
-                    {msg.file_url ? (
-                      isImageFile(msg.file_name ?? '') ? (
-                        <img
-                          src={msg.file_url}
-                          alt={msg.file_name ?? '이미지'}
-                          className="max-w-xs max-h-64 rounded-xl object-contain bg-gray-100 dark:bg-dark-surface"
-                        />
-                      ) : (
-                        <a
-                          href={msg.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-surface rounded-xl text-sm text-red-primary dark:text-yellow-primary hover:underline max-w-xs"
-                        >
-                          <Paperclip size={13} />
-                          {msg.file_name ?? '파일'}
-                        </a>
-                      )
-                    ) : (
-                      <p className="text-sm bg-gray-100 dark:bg-dark-surface rounded-xl rounded-tl-sm px-3 py-2 max-w-2xl text-gray-700 dark:text-gray-200">
+                  msg.is_system ? (
+                    <div key={msg.id} className="flex justify-center">
+                      <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-dark-surface px-3 py-1 rounded-full">
                         {msg.content}
-                      </p>
-                    )}
-                  </div>
+                      </span>
+                    </div>
+                  ) : (
+                    <div key={msg.id} className="flex flex-col gap-0.5">
+                      <div className="flex items-baseline gap-1.5 flex-wrap">
+                        <span className={cn('text-xs font-bold', ROLE_COLOR[msg.author_role] ?? ROLE_COLOR.user)}>
+                          [{ROLE_LABEL[msg.author_role] ?? msg.author_role}] {msg.author_name}
+                        </span>
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-bold', PP_BADGE[msg.author_pp] ?? PP_BADGE['무소속'])}>
+                          {msg.author_pp}
+                        </span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{fmt(msg.created_at)}</span>
+                      </div>
+                      {msg.file_url ? (
+                        isImageFile(msg.file_name ?? '') ? (
+                          <img
+                            src={msg.file_url}
+                            alt={msg.file_name ?? '이미지'}
+                            className="max-w-xs max-h-64 rounded-xl object-contain bg-gray-100 dark:bg-dark-surface"
+                          />
+                        ) : (
+                          <a
+                            href={msg.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-dark-surface rounded-xl text-sm text-red-primary dark:text-yellow-primary hover:underline max-w-xs"
+                          >
+                            <Paperclip size={13} />
+                            {msg.file_name ?? '파일'}
+                          </a>
+                        )
+                      ) : (
+                        <p className="text-sm bg-gray-100 dark:bg-dark-surface rounded-xl rounded-tl-sm px-3 py-2 max-w-2xl break-words text-gray-700 dark:text-gray-200">
+                          {msg.content}
+                        </p>
+                      )}
+                    </div>
+                  )
                 ))}
               </div>
 
               {/* 멤버 사이드 패널 */}
               {showMembers && (
-                <aside className="w-56 shrink-0 border-l border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface flex flex-col overflow-hidden">
+                <aside className="w-52 shrink-0 border-l border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface flex flex-col overflow-hidden">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 dark:border-dark-border shrink-0">
                     <Users size={13} className="text-red-primary dark:text-yellow-primary" />
                     <span className="text-xs font-bold text-gray-700 dark:text-gray-200 flex-1">멤버</span>
@@ -587,13 +783,13 @@ export default function ChatPage() {
                               return (
                                 <div
                                   key={m.user_id}
-                                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white dark:hover:bg-dark-bg transition-colors"
+                                  className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg hover:bg-white dark:hover:bg-dark-bg transition-colors"
                                 >
                                   <span className={cn(
                                     'w-2 h-2 rounded-full shrink-0 animate-pulse',
                                     isOnline ? 'bg-green-400' : 'bg-red-400'
                                   )} />
-                                  <span className={cn('text-xs truncate', ROLE_COLOR[m.role] ?? ROLE_COLOR.user)}>
+                                  <span className={cn('text-xs truncate flex-1', ROLE_COLOR[m.role] ?? ROLE_COLOR.user)}>
                                     {selectedRoom.created_by === m.user_id && '👑 '}
                                     {m.name}
                                   </span>
@@ -616,50 +812,55 @@ export default function ChatPage() {
             </div>
 
             {/* 입력창 */}
-            <form
-              onSubmit={handleSend}
-              className="p-3 border-t border-gray-200 dark:border-dark-border flex gap-2 shrink-0 bg-white dark:bg-dark-bg items-center"
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={(e: any) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleFileUpload(f);
-                  e.target.value = '';
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                title="파일 첨부"
-                className="p-2.5 rounded-xl text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors disabled:opacity-40 shrink-0"
+            {isReadOnly ? (
+              <div className="p-3 border-t border-gray-200 dark:border-dark-border flex items-center justify-center bg-white dark:bg-dark-bg shrink-0">
+                <p className="text-xs text-gray-400 dark:text-gray-500">📢 관리자만 메시지를 보낼 수 있는 공지 채널입니다</p>
+              </div>
+            ) : (
+              <form
+                onSubmit={handleSend}
+                className="p-3 border-t border-gray-200 dark:border-dark-border flex gap-2 shrink-0 bg-white dark:bg-dark-bg items-center"
               >
-                <Plus size={16} />
-              </button>
-              <input
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                placeholder={
-                  uploading
-                    ? '파일 업로드 중...'
-                    : selectedRoom.is_support && myRank >= 1
-                      ? '메시지 또는 /end 로 종료'
-                      : '메시지를 입력하세요...'
-                }
-                disabled={uploading}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors disabled:opacity-60"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || sending || uploading}
-                className="px-4 py-2.5 rounded-xl bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 hover:bg-red-hover dark:hover:bg-yellow-hover transition-colors disabled:opacity-40 shrink-0"
-              >
-                <Send size={15} />
-              </button>
-            </form>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e: any) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleFileUpload(f);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  title="파일 첨부"
+                  className="p-2.5 rounded-xl text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors disabled:opacity-40 shrink-0"
+                >
+                  <Plus size={16} />
+                </button>
+                <input
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  placeholder={
+                    uploading ? '파일 업로드 중...' :
+                    isCreator ? '메시지, /kick 이름, /announcement 텍스트...' :
+                    selectedRoom.is_support && myRank >= 1 ? '메시지 또는 /end 로 종료' :
+                    '메시지를 입력하세요...'
+                  }
+                  disabled={uploading}
+                  className="flex-1 min-w-0 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-surface text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors disabled:opacity-60"
+                />
+                <button
+                  type="submit"
+                  disabled={!input.trim() || sending || uploading}
+                  className="px-4 py-2.5 rounded-xl bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 hover:bg-red-hover dark:hover:bg-yellow-hover transition-colors disabled:opacity-40 shrink-0"
+                >
+                  <Send size={15} />
+                </button>
+              </form>
+            )}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center bg-white dark:bg-dark-bg">
@@ -674,6 +875,29 @@ export default function ChatPage() {
           </div>
         )}
       </section>
+
+      {/* ── 공지 팝업 ────────────────────────────────────────────────── */}
+      {announcementPopup && selectedRoom?.announcement && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>📌</span>
+                <h2 className="font-bold text-gray-900 dark:text-white text-sm">채팅방 공지사항</h2>
+              </div>
+              <button
+                onClick={() => setAnnouncementPopup(false)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-bg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+              {selectedRoom.announcement}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── 방 편집 모달 (개설자 전용) ──────────────────────────────── */}
       {editingRoom && selectedRoom && (

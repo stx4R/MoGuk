@@ -161,9 +161,10 @@ export default function VotePage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }: { data: { user: unknown } }) => {
-      if (!data.user) router.push('/login');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' && !session) router.push('/login');
     });
+    return () => subscription.unsubscribe();
   }, [router]);
 
   return (
