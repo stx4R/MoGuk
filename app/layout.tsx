@@ -9,6 +9,8 @@ import PIPChat from '@/components/chat/PIPChat';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AnnouncementBanner from '@/components/layout/AnnouncementBanner';
+// /voteresult 결과 팝업 — 비로그인 포함 전원 수신 S
+import VoteResultModal from '@/components/vote/VoteResultModal';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -40,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="flex-1">{children}</main>
               <Footer />
               <PIPChat />
+              <VoteResultModal />
             </PIPChatProvider>
           </OnlineUsersProvider>
         </ThemeProvider>

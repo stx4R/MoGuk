@@ -29,7 +29,7 @@ export default function HomePage() {
             </span>
           </h1>
           <p className="text-lg max-md:text-base text-gray-500 dark:text-gray-400 mb-10 max-w-xl mx-auto leading-relaxed">
-            보이지 않는 곳에서
+            보이지 않는 곳에서 
             <br className="max-md:hidden" />
             보이는 것을 위하여
           </p>

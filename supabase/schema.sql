@@ -57,12 +57,13 @@ create table public.agenda_items (
   category      text        not null default '법률안'
                             check (category in ('법률안', '결의안', '예산안', '기타')),
   is_open       boolean     not null default false,
+  is_completed  boolean     not null default false,
   display_order integer     not null default 0,
   opened_at     timestamptz,
   closed_at     timestamptz,
   created_at    timestamptz not null default now()
 );
-comment on table public.agenda_items is '투표 안건 목록';
+comment on table public.agenda_items is '투표 안건 목록 — is_open: 투표 가능 여부, is_completed: 완료(Vote탭 숨김)';
 
 -- 투표 — (agenda_id, user_id) UNIQUE로 중복 투표 원천 차단
 create table public.votes (
@@ -142,6 +143,22 @@ create table public.bug_reports (
   resolved    boolean     not null default false,
   created_at  timestamptz not null default now()
 );
+
+-- 투표 결과 브로드캐스트 (Guest 포함 전체 공개 — anon SELECT 허용) S
+create table public.vote_result_broadcasts (
+  id            uuid        primary key default gen_random_uuid(),
+  agenda_id     uuid        not null references public.agenda_items(id) on delete cascade,
+  title         text        not null,
+  description   text,
+  yes_count     integer     not null default 0,
+  no_count      integer     not null default 0,
+  abstain_count integer     not null default 0,
+  total_voted   integer     not null default 0,
+  total_users   integer     not null default 0,
+  admin_name    text        not null,
+  created_at    timestamptz not null default now()
+);
+comment on table public.vote_result_broadcasts is '/voteresult 명령어로 생성되는 전체 공개 투표 결과 — 비로그인 포함 전원 수신';
 
 -- 관리자 호출
 -- C-3 fix: responder_id 추가 + 'active' 상태 추가 S
@@ -434,6 +451,16 @@ create policy "Admin만 버그 제보 삭제 가능"
   on public.bug_reports for delete to authenticated
   using (public.is_admin());
 
+-- vote_result_broadcasts (비로그인 포함 전원 조회, Admin만 삽입)
+alter table public.vote_result_broadcasts enable row level security;
+
+create policy "모든 사용자 투표 결과 조회 가능"
+  on public.vote_result_broadcasts for select to anon, authenticated using (true);
+
+create policy "Admin만 투표 결과 브로드캐스트 가능"
+  on public.vote_result_broadcasts for insert to authenticated
+  with check (public.is_admin());
+
 -- admin_calls
 create policy "Admin/Mod 또는 본인이 호출 조회 가능"
   on public.admin_calls for select to authenticated
@@ -512,7 +539,43 @@ exception
 end;
 $$;
 
--- Admin: 안건 열기/닫기
+-- Admin: 안건 생성 (자동 공지 포함) S
+create or replace function public.admin_create_agenda(
+  p_title       text,
+  p_description text
+)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  v_new_id       uuid;
+  v_display_order integer;
+  v_admin_name   text;
+begin
+  if not public.is_admin() then
+    return json_build_object('success', false, 'error', '권한이 없습니다.');
+  end if;
+
+  select coalesce(max(display_order), 0) + 1 into v_display_order from public.agenda_items;
+  select name into v_admin_name from public.profiles where id = auth.uid();
+
+  insert into public.agenda_items (title, description, is_open, is_completed, display_order)
+  values (p_title, p_description, false, false, v_display_order)
+  returning id into v_new_id;
+
+  insert into public.admin_logs (admin_id, action, detail)
+  values (auth.uid(), 'agenda_create', '"' || p_title || '" 투표 생성');
+
+  -- 생성 자동 공지
+  insert into public.announcements (content, author, admin_id)
+  values ('"' || p_title || '" 투표가 생성되었습니다.', v_admin_name, auth.uid());
+
+  return json_build_object('success', true, 'id', v_new_id);
+end;
+$$;
+
+-- Admin: 안건 열기/닫기 (자동 공지 포함, 완료된 안건 차단) S
 create or replace function public.admin_toggle_agenda(
   p_agenda_id uuid,
   p_open      boolean
@@ -521,10 +584,27 @@ returns json
 language plpgsql
 security definer
 as $$
+declare
+  v_title        text;
+  v_is_completed boolean;
+  v_admin_name   text;
 begin
   if not public.is_admin() then
     return json_build_object('success', false, 'error', '권한이 없습니다.');
   end if;
+
+  select title, is_completed into v_title, v_is_completed
+  from public.agenda_items where id = p_agenda_id;
+
+  if not found then
+    return json_build_object('success', false, 'error', '안건을 찾을 수 없습니다.');
+  end if;
+
+  if v_is_completed then
+    return json_build_object('success', false, 'error', '완료된 투표는 변경할 수 없습니다.');
+  end if;
+
+  select name into v_admin_name from public.profiles where id = auth.uid();
 
   update public.agenda_items
   set
@@ -537,8 +617,53 @@ begin
   values (
     auth.uid(),
     case when p_open then 'agenda_open' else 'agenda_close' end,
-    '안건 ID: ' || p_agenda_id::text
+    '"' || v_title || '"' || case when p_open then ' 투표 열기' else ' 투표 닫기' end
   );
+
+  -- 열기/닫기 자동 공지
+  insert into public.announcements (content, author, admin_id)
+  values (
+    '"' || v_title || '" ' || case when p_open then '투표가 가능합니다.' else '투표가 일시 중단되었습니다.' end,
+    v_admin_name,
+    auth.uid()
+  );
+
+  return json_build_object('success', true);
+end;
+$$;
+
+-- Admin: 안건 투표 완료 처리 (데이터 잠금 + Vote탭 숨김 + 자동 공지) S
+create or replace function public.admin_complete_agenda(p_agenda_id uuid)
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  v_title      text;
+  v_admin_name text;
+begin
+  if not public.is_admin() then
+    return json_build_object('success', false, 'error', '권한이 없습니다.');
+  end if;
+
+  select title into v_title from public.agenda_items where id = p_agenda_id;
+
+  if not found then
+    return json_build_object('success', false, 'error', '안건을 찾을 수 없습니다.');
+  end if;
+
+  select name into v_admin_name from public.profiles where id = auth.uid();
+
+  update public.agenda_items
+  set is_open = false, is_completed = true, closed_at = now()
+  where id = p_agenda_id;
+
+  insert into public.admin_logs (admin_id, action, detail)
+  values (auth.uid(), 'agenda_complete', '"' || v_title || '" 투표 완료');
+
+  -- 완료 자동 공지
+  insert into public.announcements (content, author, admin_id)
+  values ('"' || v_title || '" 투표가 완료되었습니다.', v_admin_name, auth.uid());
 
   return json_build_object('success', true);
 end;
@@ -659,10 +784,19 @@ select
 from public.votes
 group by agenda_id;
 
--- 안건 + 투표 집계 조인 뷰
-create or replace view public.agenda_with_votes as
+-- 안건 + 투표 집계 조인 뷰 (컬럼 명시 — a.* 사용 시 뷰 재생성 충돌 방지) S
+create view public.agenda_with_votes as
 select
-  a.*,
+  a.id,
+  a.title,
+  a.description,
+  a.category,
+  a.is_open,
+  a.is_completed,
+  a.display_order,
+  a.opened_at,
+  a.closed_at,
+  a.created_at,
   coalesce(v.yes_count, 0)     as yes_count,
   coalesce(v.no_count, 0)      as no_count,
   coalesce(v.abstain_count, 0) as abstain_count,
@@ -685,10 +819,44 @@ alter publication supabase_realtime add table public.chat_rooms;
 alter publication supabase_realtime add table public.chat_messages;
 alter publication supabase_realtime add table public.chat_room_members;
 alter publication supabase_realtime add table public.admin_calls;
+-- 투표 결과 브로드캐스트 Realtime (Guest 포함 전체 수신) S
+alter publication supabase_realtime add table public.vote_result_broadcasts;
 
 
 -- -----------------------------------------------------------------
--- 8. 초기 데이터 (테스트용 — 실제 운영 전 제거)
+-- 8. Migration — 기존 DB에 적용할 SQL (Supabase SQL Editor에서 실행)
+-- -----------------------------------------------------------------
+-- (아래 블록을 기존 DB에서 실행하세요. 신규 설치는 1번부터 전체 실행)
+--
+-- Step 1: agenda_items에 is_completed 컬럼 추가
+-- alter table public.agenda_items add column if not exists is_completed boolean not null default false;
+--
+-- Step 2: agenda_with_votes 뷰 재생성 (is_completed 포함)
+-- create or replace view public.agenda_with_votes as
+-- select
+--   a.*,
+--   coalesce(v.yes_count, 0)     as yes_count,
+--   coalesce(v.no_count, 0)      as no_count,
+--   coalesce(v.abstain_count, 0) as abstain_count,
+--   coalesce(v.total_count, 0)   as total_count
+-- from public.agenda_items a
+-- left join public.vote_counts v on v.agenda_id = a.id
+-- order by a.display_order, a.created_at;
+--
+-- Step 3: vote_result_broadcasts 테이블 생성
+-- (위 1번 테이블 생성 SQL 그대로 실행)
+--
+-- Step 4: vote_result_broadcasts RLS 정책 추가
+-- (위 RLS 섹션의 vote_result_broadcasts 정책 SQL 그대로 실행)
+--
+-- Step 5: 신규 RPC 함수 등록
+-- (admin_create_agenda, admin_toggle_agenda 업데이트, admin_complete_agenda 함수 SQL 그대로 실행)
+--
+-- Step 6: Realtime 활성화
+-- alter publication supabase_realtime add table public.vote_result_broadcasts;
+
+-- -----------------------------------------------------------------
+-- 9. 초기 데이터 (테스트용 — 실제 운영 전 제거)
 -- -----------------------------------------------------------------
 insert into public.agenda_items (title, description, category, is_open, display_order)
 values

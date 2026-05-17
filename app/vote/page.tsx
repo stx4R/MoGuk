@@ -1,189 +1,337 @@
-// 안건 투표 페이지 — 데스크탑: 카드 그리드, 모바일: 아코디언 S
+// 안건 투표 페이지 — Design B: 좌측 목록 + 우측 상세 2열, 백분율 비공개 S
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, MinusCircle, Clock, Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
-
-type VoteChoice = 'yes' | 'no' | 'abstain' | null;
 
 type AgendaItem = {
   id: string;
   title: string;
-  description: string;
-  category: string;
-  yesCount: number;
-  noCount: number;
-  abstainCount: number;
-  isOpen: boolean;
+  description: string | null;
+  is_open: boolean;
+  is_completed: boolean;
 };
 
-const AGENDA_ITEMS: AgendaItem[] = Array.from({ length: 6 }, (_, i) => ({
-  id: `agenda-${i + 1}`,
-  title: `제 ${i + 1}호 안건`,
-  description: `텍스트 ${i + 1}\n\n해당 안건의 세부 내용이 여기에 기입될 예정입니다. 현재는 임시 텍스트로 구성되어 있습니다.`,
-  category: ['법률안', '결의안', '예산안'][i % 3],
-  yesCount: Math.floor(Math.random() * 80),
-  noCount: Math.floor(Math.random() * 40),
-  abstainCount: Math.floor(Math.random() * 20),
-  isOpen: i < 3,
-}));
+type MyVoteMap = Record<string, 'yes' | 'no' | 'abstain'>;
 
-function VoteBar({ yes, no, abstain }: { yes: number; no: number; abstain: number }) {
-  const total = yes + no + abstain || 1;
-  const yPct = Math.round((yes / total) * 100);
-  const nPct = Math.round((no / total) * 100);
-  const aPct = 100 - yPct - nPct;
+// ── 좌측 목록 아이템 ─────────────────────────────────────────────
+function AgendaListItem({
+  item,
+  selected,
+  myVote,
+  onClick,
+}: {
+  item: AgendaItem;
+  selected: boolean;
+  myVote: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 flex items-center gap-3',
+        selected
+          ? 'bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 shadow-md'
+          : 'hover:bg-gray-100 dark:hover:bg-dark-bg text-gray-700 dark:text-gray-300'
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <p className={cn(
+          'text-sm font-bold truncate',
+          selected ? '' : 'text-gray-900 dark:text-gray-100'
+        )}>
+          {item.title}
+        </p>
+        <p className={cn(
+          'text-xs mt-0.5',
+          selected ? 'text-white/70 dark:text-gray-900/70' : 'text-gray-400 dark:text-gray-500'
+        )}>
+          {item.is_open ? '투표 진행 중' : '대기 중'}
+          {myVote && ' · 투표 완료'}
+        </p>
+      </div>
+      <span className={cn(
+        'w-2 h-2 rounded-full shrink-0',
+        item.is_open
+          ? (selected ? 'bg-white dark:bg-gray-900' : 'bg-green-400 animate-pulse')
+          : (selected ? 'bg-white/40 dark:bg-gray-900/40' : 'bg-gray-300 dark:bg-gray-600')
+      )} />
+    </button>
+  );
+}
+
+// ── 우측 상세 + 투표 UI ────────────────────────────────────────
+function AgendaDetail({
+  item,
+  myVote,
+  isLoggedIn,
+  onVote,
+}: {
+  item: AgendaItem;
+  myVote: 'yes' | 'no' | 'abstain' | null;
+  isLoggedIn: boolean;
+  onVote: (choice: 'yes' | 'no' | 'abstain') => Promise<void>;
+}) {
+  const [voting, setVoting] = useState(false);
+
+  const handleVote = async (choice: 'yes' | 'no' | 'abstain') => {
+    if (voting || myVote || !item.is_open) return;
+    setVoting(true);
+    await onVote(choice);
+    setVoting(false);
+  };
+
+  const CHOICES = [
+    {
+      choice: 'yes'     as const, label: '찬성', Icon: CheckCircle2,
+      activeClass: 'bg-yellow-primary border-yellow-primary text-white',
+      hoverClass: 'hover:border-yellow-primary hover:text-yellow-primary',
+    },
+    {
+      choice: 'no'      as const, label: '반대', Icon: XCircle,
+      activeClass: 'bg-red-primary border-red-primary text-white',
+      hoverClass: 'hover:border-red-primary hover:text-red-primary',
+    },
+    {
+      choice: 'abstain' as const, label: '기권', Icon: MinusCircle,
+      activeClass: 'bg-gray-500 border-gray-500 text-white',
+      hoverClass: 'hover:border-gray-400 hover:text-gray-500',
+    },
+  ];
+
+  const VOTE_LABEL: Record<string, string> = { yes: '찬성', no: '반대', abstain: '기권' };
 
   return (
-    <div className="mt-3 space-y-1.5">
-      <div className="flex gap-0.5 h-2 rounded-full overflow-hidden w-full">
-        <div
-          className="bg-yellow-primary transition-all duration-700"
-          style={{ width: `${yPct}%` }}
-        />
-        <div
-          className="bg-red-primary transition-all duration-700"
-          style={{ width: `${nPct}%` }}
-        />
-        <div
-          className="bg-gray-300 dark:bg-dark-border transition-all duration-700"
-          style={{ width: `${aPct}%` }}
-        />
+    <div className="flex flex-col h-full p-8 max-md:p-5">
+      {/* 상태 배지 */}
+      <div className="mb-5">
+        {item.is_open ? (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-green-400/15 text-green-600 dark:text-green-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            투표 진행 중
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-gray-100 dark:bg-dark-bg text-gray-400 dark:text-gray-500">
+            <Clock size={11} />
+            투표 대기 중
+          </span>
+        )}
       </div>
-      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span className="text-yellow-primary font-medium">찬성 {yPct}%</span>
-        <span className="text-red-primary font-medium">반대 {nPct}%</span>
-        <span>기권 {aPct}%</span>
+
+      {/* 제목 */}
+      <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-2 leading-tight">
+        {item.title}
+      </h2>
+      <div className="w-12 h-1 rounded-full bg-red-primary dark:bg-yellow-primary mb-6" />
+
+      {/* 세부사항 */}
+      {item.description && (
+        <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed border-l-2 border-red-primary/30 dark:border-yellow-primary/30 pl-4 mb-8 whitespace-pre-line">
+          {item.description}
+        </p>
+      )}
+
+      {/* 투표 영역 (하단 고정) */}
+      <div className="mt-auto">
+        {!isLoggedIn ? (
+          <div className="rounded-2xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border p-8 text-center">
+            <Lock size={28} className="mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+            <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
+              투표하려면 로그인이 필요합니다.
+            </p>
+          </div>
+        ) : myVote ? (
+          <div className="rounded-2xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border p-8 text-center">
+            <CheckCircle2 size={32} className="mx-auto mb-3 text-green-500" />
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">투표가 완료되었습니다.</p>
+            <p className="text-xl font-extrabold text-gray-900 dark:text-white">
+              {VOTE_LABEL[myVote]}
+            </p>
+          </div>
+        ) : !item.is_open ? (
+          <div className="rounded-2xl bg-gray-50 dark:bg-dark-bg border border-gray-200 dark:border-dark-border p-8 text-center">
+            <Clock size={28} className="mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+            <p className="text-sm font-semibold text-gray-400 dark:text-gray-500">
+              투표가 아직 시작되지 않았습니다.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs text-center text-gray-400 dark:text-gray-500 mb-4">
+              의사를 선택하세요. 제출 후 변경할 수 없습니다.
+            </p>
+            <div className="flex gap-3 max-md:flex-col">
+              {CHOICES.map(({ choice, label, Icon, activeClass, hoverClass }) => (
+                <button
+                  key={choice}
+                  onClick={() => handleVote(choice)}
+                  disabled={voting}
+                  className={cn(
+                    'flex-1 flex flex-col items-center gap-2.5 py-6 rounded-2xl border-2 font-bold text-sm transition-all duration-200',
+                    'border-gray-200 dark:border-dark-border text-gray-400 dark:text-gray-500',
+                    hoverClass,
+                    'hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]',
+                    voting && 'opacity-50 cursor-not-allowed pointer-events-none'
+                  )}
+                >
+                  <Icon size={26} />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function VoteCard({ item }: { item: AgendaItem }) {
-  const [vote, setVote] = useState<VoteChoice>(null);
-  const [open, setOpen] = useState(false);
-  const [counts, setCounts] = useState({
-    yes: item.yesCount,
-    no: item.noCount,
-    abstain: item.abstainCount,
-  });
-
-  const handleVote = (choice: VoteChoice) => {
-    if (!item.isOpen || vote === choice) return;
-    // 낙관적 업데이트 S
-    setCounts((prev) => {
-      const next = { ...prev };
-      if (vote) next[vote] = Math.max(0, next[vote] - 1);
-      if (choice) next[choice] = next[choice] + 1;
-      return next;
-    });
-    setVote(choice);
-  };
-
-  return (
-    <article
-      className={cn(
-        'group relative rounded-2xl border bg-white dark:bg-dark-surface p-6 transition-all duration-300',
-        'hover:-translate-y-1 hover:shadow-xl hover:shadow-red-primary/10 dark:hover:shadow-yellow-primary/10',
-        item.isOpen
-          ? 'border-gray-200 dark:border-dark-border'
-          : 'border-gray-100 dark:border-dark-border/50 opacity-60'
-      )}
-    >
-      {/* 카테고리 배지 */}
-      <span className="inline-block text-xs font-semibold px-2.5 py-1 rounded-full bg-red-primary/10 text-red-primary dark:bg-yellow-primary/10 dark:text-yellow-primary mb-3">
-        {item.category}
-      </span>
-
-      <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-        {item.title}
-      </h3>
-
-      {/* 설명 토글 */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 mb-3 transition-colors"
-      >
-        {open ? '접기' : '안건 내용 보기'}
-        <ChevronDown
-          size={14}
-          className={cn('transition-transform duration-200', open && 'rotate-180')}
-        />
-      </button>
-
-      {open && (
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-4 whitespace-pre-line leading-relaxed border-l-2 border-red-primary/30 dark:border-yellow-primary/30 pl-3">
-          {item.description}
-        </p>
-      )}
-
-      <VoteBar yes={counts.yes} no={counts.no} abstain={counts.abstain} />
-
-      {/* 투표 버튼 */}
-      <div className="flex gap-2 mt-4">
-        {[
-          { choice: 'yes' as VoteChoice, label: '찬성', Icon: CheckCircle2, active: 'bg-yellow-primary text-white dark:glow-yellow' },
-          { choice: 'no' as VoteChoice, label: '반대', Icon: XCircle, active: 'bg-red-primary text-white' },
-          { choice: 'abstain' as VoteChoice, label: '기권', Icon: MinusCircle, active: 'bg-gray-500 text-white' },
-        ].map(({ choice, label, Icon, active }) => (
-          <button
-            key={choice}
-            onClick={() => handleVote(choice)}
-            disabled={!item.isOpen}
-            className={cn(
-              'flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-200',
-              vote === choice
-                ? active
-                : 'border-gray-200 dark:border-dark-border text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600',
-              !item.isOpen && 'cursor-not-allowed'
-            )}
-          >
-            <Icon size={15} />
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {!item.isOpen && (
-        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-3">
-          투표가 마감되었습니다
-        </p>
-      )}
-    </article>
-  );
-}
-
+// ── 메인 페이지 ─────────────────────────────────────────────────
 export default function VotePage() {
   const router = useRouter();
+  const supabase = useRef(createClient()).current;
+
+  const [agendas, setAgendas]     = useState<AgendaItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [myVotes, setMyVotes]     = useState<MyVoteMap>({});
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const agendaChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const loadAgendas = useCallback(async () => {
+    const { data } = await supabase
+      .from('agenda_items')
+      .select('id, title, description, is_open, is_completed')
+      .eq('is_completed', false)
+      .order('display_order');
+    if (data) {
+      setAgendas(data as AgendaItem[]);
+      setSelectedId(prev => {
+        if (prev && data.some((a: AgendaItem) => a.id === prev)) return prev;
+        return data.length > 0 ? data[0].id : null;
+      });
+    }
+  }, [supabase]);
 
   useEffect(() => {
-    const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'INITIAL_SESSION' && !session) router.push('/login');
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event !== 'INITIAL_SESSION') return;
+
+      if (!session) {
+        router.push('/login');
+        return;
+      }
+
+      setIsLoggedIn(true);
+
+      await loadAgendas();
+
+      // 내 투표 내역 로드
+      const { data: votesData } = await supabase
+        .from('votes')
+        .select('agenda_id, choice')
+        .eq('user_id', session.user.id);
+
+      if (votesData) {
+        const map: MyVoteMap = {};
+        votesData.forEach((v: { agenda_id: string; choice: string }) => {
+          map[v.agenda_id] = v.choice as 'yes' | 'no' | 'abstain';
+        });
+        setMyVotes(map);
+      }
+
+      setLoading(false);
+
+      // 안건 변경 실시간 구독
+      agendaChRef.current = supabase
+        .channel('vote-page-agendas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_items' }, loadAgendas)
+        .subscribe();
     });
-    return () => subscription.unsubscribe();
-  }, [router]);
+
+    return () => {
+      subscription.unsubscribe();
+      if (agendaChRef.current) supabase.removeChannel(agendaChRef.current);
+    };
+  }, [router, supabase, loadAgendas]);
+
+  const handleVote = useCallback(async (agendaId: string, choice: 'yes' | 'no' | 'abstain') => {
+    const { data } = await supabase.rpc('submit_vote', { p_agenda_id: agendaId, p_choice: choice });
+    if (data?.success) {
+      setMyVotes(prev => ({ ...prev, [agendaId]: choice }));
+    } else {
+      alert(data?.error ?? '투표 처리 중 오류가 발생했습니다.');
+    }
+  }, [supabase]);
+
+  const selectedAgenda = agendas.find(a => a.id === selectedId) ?? null;
+
+  if (loading) {
+    return (
+      <div className="h-[calc(100vh-4rem)] flex items-center justify-center">
+        <p className="text-sm text-gray-400 dark:text-gray-500">로딩 중...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="mb-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
           안건 투표
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">
-          현재 투표 가능한 안건을 확인하고 의사를 표명하세요.
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          좌측에서 안건을 선택한 후 의사를 표명하세요.
         </p>
       </div>
 
-      {/* 데스크탑: 3열 그리드 / 모바일: 1열 */}
-      <div className="grid grid-cols-3 max-md:grid-cols-1 gap-6">
-        {AGENDA_ITEMS.map((item) => (
-          <VoteCard key={item.id} item={item} />
-        ))}
-      </div>
+      {agendas.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-28 text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-dark-surface flex items-center justify-center mb-4">
+            <Lock size={24} className="text-gray-300 dark:text-gray-600" />
+          </div>
+          <p className="text-base font-semibold text-gray-500 dark:text-gray-400">
+            현재 등록된 안건이 없습니다.
+          </p>
+        </div>
+      ) : (
+        /* 데스크탑: 좌측 목록 + 우측 상세 / 모바일: 세로 스택 */
+        <div className="flex gap-6 max-md:flex-col min-h-[500px]">
+          {/* ── 좌측: 안건 목록 ──────────────────────────────────── */}
+          <aside className="w-72 shrink-0 max-md:w-full">
+            <div className="bg-white dark:bg-dark-surface rounded-2xl border border-gray-200 dark:border-dark-border p-2 space-y-1 sticky top-24">
+              <p className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-4 py-2">
+                안건 목록 ({agendas.length})
+              </p>
+              {agendas.map(item => (
+                <AgendaListItem
+                  key={item.id}
+                  item={item}
+                  selected={item.id === selectedId}
+                  myVote={myVotes[item.id] ?? null}
+                  onClick={() => setSelectedId(item.id)}
+                />
+              ))}
+            </div>
+          </aside>
+
+          {/* ── 우측: 상세 + 투표 ────────────────────────────────── */}
+          {selectedAgenda ? (
+            <div className="flex-1 bg-white dark:bg-dark-surface rounded-2xl border border-gray-200 dark:border-dark-border overflow-hidden">
+              <AgendaDetail
+                item={selectedAgenda}
+                myVote={myVotes[selectedAgenda.id] ?? null}
+                isLoggedIn={isLoggedIn}
+                onVote={(choice) => handleVote(selectedAgenda.id, choice)}
+              />
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
