@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus, Send, MessageSquare, Lock, PictureInPicture2,
-  X, Search, UserX, Users, Pencil, ChevronLeft,
+  X, Search, UserX, Users, Pencil, ChevronLeft, UserPlus,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { usePIPChat } from '@/components/providers/PIPChatContext';
@@ -68,6 +68,14 @@ const PARTY_LEADERS: Record<string, string> = { '진보': '김동하', '보수':
 const fmt = (ts: string) =>
   new Date(ts).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
+// 커맨드 자동완성 힌트 S
+const CHAT_CMD_HINT: Record<string, string> = {
+  '/end':          '/end',
+  '/kick':         '/kick 사용자명',
+  '/announcement': '/announcement 텍스트',
+  '/leave':        '/leave',
+};
+
 // NM-3: 파일 매직 바이트 검증 S
 async function checkMagicBytes(file: File): Promise<boolean> {
   const buf   = await file.slice(0, 12).arrayBuffer();
@@ -118,6 +126,13 @@ export default function ChatPage() {
   const [editingRoom, setEditingRoom]     = useState(false);
   const [editRoomName, setEditRoomName]   = useState('');
   const [editRoomIcon, setEditRoomIcon]   = useState('');
+
+  // 초대 모달 (채팅방 생성 후) S
+  const [showInviteModal, setShowInviteModal]   = useState(false);
+  const [inviteQuery, setInviteQuery]           = useState('');
+  const [inviteResults, setInviteResults]       = useState<SearchUser[]>([]);
+  const [pendingInvites, setPendingInvites]     = useState<SearchUser[]>([]);
+  const [inviting, setInviting]                 = useState(false);
 
   const msgPanelRef   = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
@@ -439,6 +454,18 @@ export default function ChatPage() {
       return;
     }
 
+    // /leave 커맨드 — 현재 방 나가기 S
+    if (trimmed === '/leave') {
+      await supabase.from('chat_room_members')
+        .delete().eq('room_id', selectedRoom.id).eq('user_id', myProfile.id);
+      setSelectedRoom(null);
+      setMessages([]);
+      setMobileView('rooms');
+      await loadRooms(myProfile.id);
+      setInput('');
+      return;
+    }
+
     setSending(true);
     await supabase.from('chat_messages').insert({
       room_id: selectedRoom.id,
@@ -514,11 +541,46 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, myProfile, supabase]);
 
+  // 초대 모달 유저 검색 S
+  useEffect(() => {
+    if (!inviteQuery.trim() || !myProfile) { setInviteResults([]); return; }
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles').select('id, name, role')
+        .ilike('name', `%${inviteQuery}%`).neq('id', myProfile.id).limit(8);
+      setInviteResults((data as SearchUser[]) ?? []);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inviteQuery, myProfile, supabase]);
+
   const toggleInvite = (user: SearchUser) => {
     setInviteList(prev =>
       prev.some(u => u.id === user.id) ? prev.filter(u => u.id !== user.id) : [...prev, user]
     );
   };
+
+  const togglePendingInvite = (user: SearchUser) => {
+    setPendingInvites(prev =>
+      prev.some(u => u.id === user.id) ? prev.filter(u => u.id !== user.id) : [...prev, user]
+    );
+  };
+
+  // 채팅방 생성 후 사용자 초대 S
+  const handleInviteUsers = useCallback(async () => {
+    if (!selectedRoom || !pendingInvites.length || inviting) return;
+    setInviting(true);
+    const existingIds = new Set(roomMembers.map(m => m.user_id));
+    const rows = pendingInvites
+      .filter(u => !existingIds.has(u.id))
+      .map(u => ({ room_id: selectedRoom.id, user_id: u.id }));
+    if (rows.length) await supabase.from('chat_room_members').insert(rows);
+    await loadRoomMembers(selectedRoom.id);
+    setShowInviteModal(false);
+    setPendingInvites([]);
+    setInviteQuery('');
+    setInviteResults([]);
+    setInviting(false);
+  }, [selectedRoom, pendingInvites, inviting, supabase, loadRoomMembers, roomMembers]);
 
   // ── 방 생성 ─────────────────────────────────────────────────────
   const handleCreateRoom = useCallback(async () => {
@@ -568,6 +630,19 @@ export default function ChatPage() {
   const isCreator  = !!myProfile && selectedRoom?.created_by === myProfile.id;
   const onlineIds  = new Set(onlineUsers.map(u => u.user_id));
   const isReadOnly = (selectedRoom?.is_global === true) && myProfile?.role !== 'admin';
+
+  const availableCmds = (() => {
+    const cmds: string[] = [];
+    if (selectedRoom?.is_support && myRank >= 1) cmds.push('/end');
+    if (isCreator) cmds.push('/kick', '/announcement');
+    cmds.push('/leave');
+    return cmds;
+  })();
+  const cmdSuggestions = (() => {
+    if (!input.startsWith('/') || isReadOnly || !selectedRoom) return [];
+    if (input.includes(' ')) return [];
+    return availableCmds.filter(c => c.startsWith(input));
+  })();
 
   const adminMembers = roomMembers.filter(m => m.role === 'admin');
   const modMembers   = roomMembers.filter(m => m.role === 'mod');
@@ -689,6 +764,16 @@ export default function ChatPage() {
                   className="p-1.5 rounded-lg text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors shrink-0"
                 >
                   <Pencil size={14} />
+                </button>
+              )}
+              {/* 사용자 초대 (개설자/Admin) S */}
+              {(isCreator || myProfile?.role === 'admin') && !selectedRoom.is_global && (
+                <button
+                  onClick={() => { setShowInviteModal(true); setPendingInvites([]); setInviteQuery(''); setInviteResults([]); }}
+                  title="사용자 초대"
+                  className="p-1.5 rounded-lg text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors shrink-0"
+                >
+                  <UserPlus size={14} />
                 </button>
               )}
               {/* 멤버 패널 토글 */}
@@ -845,6 +930,25 @@ export default function ChatPage() {
               )}
             </div>
 
+            {/* 커맨드 자동완성 S */}
+            {cmdSuggestions.length > 0 && (
+              <div className="mx-3 mb-1 border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-bg shadow-lg">
+                {cmdSuggestions.map(cmd => (
+                  <button
+                    key={cmd}
+                    type="button"
+                    onMouseDown={() => setInput(CHAT_CMD_HINT[cmd] ?? cmd)}
+                    className="w-full text-left px-4 py-2.5 text-sm font-mono text-red-primary dark:text-yellow-primary hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors border-b last:border-0 border-gray-100 dark:border-dark-border"
+                  >
+                    <span className="font-bold">{cmd}</span>
+                    {(CHAT_CMD_HINT[cmd]?.length ?? 0) > cmd.length && (
+                      <span className="text-gray-400 dark:text-gray-500 ml-2 text-xs">{CHAT_CMD_HINT[cmd].slice(cmd.length)}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* 입력창 */}
             {isReadOnly ? (
               <div className="p-3 border-t border-gray-200 dark:border-dark-border flex items-center justify-center bg-white dark:bg-dark-bg shrink-0">
@@ -877,11 +981,17 @@ export default function ChatPage() {
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Tab' && cmdSuggestions.length > 0) {
+                      e.preventDefault();
+                      setInput(CHAT_CMD_HINT[cmdSuggestions[0]] ?? cmdSuggestions[0]);
+                    }
+                  }}
                   placeholder={
                     uploading ? '파일 업로드 중...' :
-                    isCreator ? '메시지, /kick 이름, /announcement 텍스트...' :
-                    selectedRoom.is_support && myRank >= 1 ? '메시지 또는 /end 로 종료' :
-                    '메시지를 입력하세요...'
+                    isCreator ? '메시지, /kick, /announcement, /leave...' :
+                    selectedRoom.is_support && myRank >= 1 ? '메시지, /end 또는 /leave' :
+                    '메시지 또는 /leave...'
                   }
                   disabled={uploading}
                   maxLength={2000}
@@ -1070,6 +1180,94 @@ export default function ChatPage() {
               className="w-full py-2.5 rounded-xl bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 font-semibold text-sm hover:bg-red-hover dark:hover:bg-yellow-hover transition-colors disabled:opacity-40"
             >
               {creating ? '생성 중...' : '채팅방 만들기'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 사용자 초대 모달 ──────────────────────────────────────── */}
+      {showInviteModal && selectedRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-gray-900 dark:text-white">사용자 초대</h2>
+              <button
+                onClick={() => { setShowInviteModal(false); setPendingInvites([]); setInviteQuery(''); setInviteResults([]); }}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-bg transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 block">이름으로 검색</label>
+              <div className="relative">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={inviteQuery}
+                  onChange={e => setInviteQuery(e.target.value)}
+                  placeholder="이름으로 검색..."
+                  className="w-full pl-8 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border bg-gray-50 dark:bg-dark-bg text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-primary dark:focus:border-yellow-primary transition-colors"
+                />
+              </div>
+              {inviteResults.length > 0 && (
+                <div className="mt-2 border border-gray-200 dark:border-dark-border rounded-xl overflow-hidden bg-white dark:bg-dark-bg max-h-40 overflow-y-auto">
+                  {inviteResults.map(u => {
+                    const targetRank = ROLE_RANK[u.role] ?? 0;
+                    const cannotInvite = targetRank > myRank;
+                    const alreadyMember = roomMembers.some(m => m.user_id === u.id);
+                    const isSelected = pendingInvites.some(i => i.id === u.id);
+                    return (
+                      <button
+                        key={u.id}
+                        onClick={() => !cannotInvite && !alreadyMember && togglePendingInvite(u)}
+                        disabled={cannotInvite || alreadyMember}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 px-3 py-2.5 text-left border-b last:border-0 border-gray-100 dark:border-dark-border transition-colors',
+                          cannotInvite || alreadyMember
+                            ? 'opacity-50 cursor-not-allowed'
+                            : isSelected
+                              ? 'bg-red-primary/5 dark:bg-yellow-primary/5'
+                              : 'hover:bg-gray-50 dark:hover:bg-dark-surface'
+                        )}
+                      >
+                        <span className={cn('text-xs px-1.5 py-0.5 rounded font-bold', ROLE_BADGE[u.role] ?? ROLE_BADGE.user)}>
+                          {ROLE_LABEL[u.role] ?? u.role}
+                        </span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">{u.name}</span>
+                        {cannotInvite ? (
+                          <span className="text-xs text-gray-400 flex items-center gap-1"><UserX size={12} /> 초대 불가</span>
+                        ) : alreadyMember ? (
+                          <span className="text-xs text-gray-400">이미 참가 중</span>
+                        ) : isSelected ? (
+                          <span className="text-xs text-red-primary dark:text-yellow-primary font-semibold">✓ 선택됨</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {pendingInvites.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {pendingInvites.map(u => (
+                    <span
+                      key={u.id}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-red-primary/10 dark:bg-yellow-primary/10 text-red-primary dark:text-yellow-primary font-medium"
+                    >
+                      {u.name}
+                      <button onClick={() => togglePendingInvite(u)} className="hover:opacity-70"><X size={11} /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={handleInviteUsers}
+              disabled={!pendingInvites.length || inviting}
+              className="w-full py-2.5 rounded-xl bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 font-semibold text-sm hover:bg-red-hover dark:hover:bg-yellow-hover transition-colors disabled:opacity-40"
+            >
+              {inviting ? '초대 중...' : `${pendingInvites.length}명 초대하기`}
             </button>
           </div>
         </div>

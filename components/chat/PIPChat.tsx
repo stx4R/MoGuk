@@ -38,6 +38,9 @@ export default function PIPChat() {
   const [isSupport, setIsSupport]   = useState(false);
   const [input, setInput]           = useState('');
   const [sending, setSending]       = useState(false);
+  const [pos, setPos]               = useState({ x: 0, y: 0 });
+  const draggingRef                 = useRef(false);
+  const offsetRef                   = useRef({ x: 0, y: 0 });
   const bottomRef = useRef<HTMLDivElement>(null);
   const supabase  = useRef(createClient()).current;
 
@@ -52,6 +55,24 @@ export default function PIPChat() {
       if (prof) setMyProfile(prof as MyProfile);
     });
   }, [supabase]);
+
+  // 드래그 지원 S
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!draggingRef.current) return;
+      setPos({
+        x: Math.max(0, Math.min(e.clientX - offsetRef.current.x, window.innerWidth - 320)),
+        y: Math.max(0, Math.min(e.clientY - offsetRef.current.y, window.innerHeight - 48)),
+      });
+    };
+    const onUp = () => { draggingRef.current = false; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
 
   // 방 변경 시 메시지 로드 + 실시간 구독
   useEffect(() => {
@@ -93,6 +114,7 @@ export default function PIPChat() {
 
     loadRoom();
     setMinimized(false);
+    setPos({ x: window.innerWidth - 336, y: window.innerHeight - 400 });
     return () => { if (ch) supabase.removeChannel(ch); };
   }, [pipRoomId, supabase]);
 
@@ -129,13 +151,20 @@ export default function PIPChat() {
 
   return (
     <div
+      style={{ top: pos.y, left: pos.x }}
       className={cn(
-        'fixed bottom-4 right-4 z-50 w-80 rounded-2xl shadow-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col transition-all duration-200',
+        'fixed z-50 w-80 rounded-2xl shadow-2xl border border-gray-200 dark:border-dark-border bg-white dark:bg-dark-surface flex flex-col transition-all duration-200',
         minimized ? 'h-12' : 'h-96'
       )}
     >
       {/* 헤더 */}
-      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-dark-border shrink-0 rounded-t-2xl bg-gray-50 dark:bg-dark-bg">
+      <div
+        className="flex items-center gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-dark-border shrink-0 rounded-t-2xl bg-gray-50 dark:bg-dark-bg cursor-grab select-none"
+        onMouseDown={(e) => {
+          draggingRef.current = true;
+          offsetRef.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
+        }}
+      >
         <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
         <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 flex-1 truncate">{roomName || '채팅'}</span>
         <button

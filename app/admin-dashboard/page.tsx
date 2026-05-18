@@ -925,7 +925,17 @@ export default function AdminDashboardPage() {
             <input
               value={chatInput}
               onChange={(e) => { setChatInput(e.target.value); setShowCmds(isAdmin && e.target.value.startsWith('/')); }}
-              onKeyDown={(e) => { if (e.key === 'Escape') setShowCmds(false); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { setShowCmds(false); return; }
+                if (e.key === 'Tab') {
+                  const matches = ADMIN_COMMANDS.filter(c => c.startsWith(chatInput));
+                  if (matches.length > 0) {
+                    e.preventDefault();
+                    setChatInput(CMD_HINT[matches[0]] + ' ');
+                    setShowCmds(false);
+                  }
+                }
+              }}
               placeholder={uploading ? '파일 업로드 중...' : isAdmin ? '메시지 또는 /명령어 "인자"' : '메시지를 입력하세요...'}
               disabled={uploading}
               maxLength={2000}
