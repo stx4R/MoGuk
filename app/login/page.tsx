@@ -1,7 +1,7 @@
 'use client';
 
 // 로그인 페이지 — 데스크탑 50:50, Material Design 라벨 애니메이션 S
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Scale, LogIn, AlertCircle } from 'lucide-react';
@@ -57,7 +57,7 @@ function safeRedirect(raw: string | null): string {
   return raw && VALID_REDIRECT.has(raw) ? raw : '/';
 }
 
-export default function LoginPage() {
+function LoginContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail]     = useState('');
@@ -203,5 +203,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }
