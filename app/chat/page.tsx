@@ -72,6 +72,7 @@ const fmt = (ts: string) =>
 const CHAT_CMD_HINT: Record<string, string> = {
   '/end':          '/end',
   '/kick':         '/kick 사용자명',
+  '/promote':      '/promote 사용자명',
   '/announcement': '/announcement 텍스트',
   '/leave':        '/leave',
 };
@@ -134,6 +135,9 @@ export default function ChatPage() {
   const [pendingInvites, setPendingInvites]     = useState<SearchUser[]>([]);
   const [inviting, setInviting]                 = useState(false);
 
+  // 방장 양도 확인 모달
+  const [promoteTarget, setPromoteTarget] = useState<RoomMember | null>(null);
+
   const msgPanelRef   = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const fileInputRef  = useRef<HTMLInputElement>(null);
@@ -163,26 +167,32 @@ export default function ChatPage() {
   const ensureSpecialMembership = useCallback(async (
     userId: string, userName: string, userPp: string
   ) => {
+    // 특수방 없으면 서버에서 자동 생성 S
+    let globalRoomId: string | null = null;
+    let partyRoomIds: Record<string, string> = {};
+    try {
+      const res = await fetch('/api/ensure-special-rooms', { method: 'POST' });
+      if (res.ok) ({ globalRoomId, partyRoomIds } = await res.json());
+    } catch { /* API 오류 시 아래 DB 조회로 fallback */ }
+
     // 전체 공지방 자동 가입
-    const { data: globalRoom } = await supabase
-      .from('chat_rooms').select('id').eq('is_global', true).single();
-    if (globalRoom) {
-      await supabase.from('chat_room_members')
-        .insert({ room_id: globalRoom.id, user_id: userId });
-      // duplicate key error is expected and safe to ignore
+    const gRoomId = globalRoomId ?? (await supabase
+      .from('chat_rooms').select('id').eq('is_global', true).maybeSingle()).data?.id ?? null;
+    if (gRoomId) {
+      await supabase.from('chat_room_members').insert({ room_id: gRoomId, user_id: userId });
     }
 
     // 정당별 채팅방 자동 가입
     if (userPp && userPp !== '무소속') {
-      const { data: partyRoom } = await supabase
-        .from('chat_rooms').select('id, created_by').eq('party_tag', userPp).single();
-      if (partyRoom) {
-        await supabase.from('chat_room_members')
-          .insert({ room_id: partyRoom.id, user_id: userId });
-        // 정당 개설자 자동 설정 (미등록 상태였다가 처음 가입 시)
-        if (!partyRoom.created_by && userName === PARTY_LEADERS[userPp]) {
-          await supabase.from('chat_rooms')
-            .update({ created_by: userId }).eq('id', partyRoom.id);
+      const pRoomId = partyRoomIds[userPp] ?? (await supabase
+        .from('chat_rooms').select('id').eq('party_tag', userPp).maybeSingle()).data?.id ?? null;
+      if (pRoomId) {
+        await supabase.from('chat_room_members').insert({ room_id: pRoomId, user_id: userId });
+        // 정당 개설자 자동 설정 (처음 가입 시)
+        const { data: partyRoom } = await supabase
+          .from('chat_rooms').select('created_by').eq('id', pRoomId).single();
+        if (!partyRoom?.created_by && userName === PARTY_LEADERS[userPp]) {
+          await supabase.from('chat_rooms').update({ created_by: userId }).eq('id', pRoomId);
         }
       }
     }
@@ -229,27 +239,49 @@ export default function ChatPage() {
     setRooms(combined);
   }, [supabase]);
 
-  // ── 초기 로드 (onAuthStateChange로 로그인 루프 방지) ─────────────
+  // ── 초기 로드 (INITIAL_SESSION + SIGNED_IN 양쪽 처리로 타이밍 문제 방어) ─────────────
   useEffect(() => {
+    let initialized = false;
+
+    const initPage = async (session: any) => {
+      if (initialized) return;
+      initialized = true;
+      myUserIdRef.current = session.user.id;
+      const { data: prof } = await supabase
+        .from('profiles').select('id, name, role, pp').eq('id', session.user.id).single();
+      if (!prof) return;
+      setMyProfile(prof as MyProfile);
+      await ensureSpecialMembership(session.user.id, (prof as any).name, (prof as any).pp ?? '무소속');
+      await loadRooms(session.user.id);
+    };
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event !== 'INITIAL_SESSION') return;
-        if (!session) { router.push('/login'); return; }
-
-        myUserIdRef.current = session.user.id;
-        const { data: prof } = await supabase
-          .from('profiles').select('id, name, role, pp')
-          .eq('id', session.user.id).single();
-        if (!prof) return;
-        setMyProfile(prof as MyProfile);
-        await ensureSpecialMembership(
-          session.user.id, (prof as any).name, (prof as any).pp ?? '무소속'
-        );
-        await loadRooms(session.user.id);
+        if (event === 'SIGNED_OUT') { router.push('/login'); return; }
+        if (event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') return;
+        if (!session) { if (event === 'INITIAL_SESSION') router.push('/login'); return; }
+        await initPage(session);
       }
     );
     return () => subscription.unsubscribe();
   }, [supabase, router, ensureSpecialMembership, loadRooms]);
+
+  // PP 변경 감지 → 방 목록 새로고침 (DB 트리거가 멤버십 교체, 프론트엔드는 UI 갱신) S
+  useEffect(() => {
+    if (!myProfile?.id) return;
+    const userId = myProfile.id;
+    const ch = supabase.channel(`profile-watch:${userId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'profiles',
+        filter: `id=eq.${userId}`,
+      }, async (payload: any) => {
+        const newPp: string = (payload.new as any)?.pp ?? '무소속';
+        setMyProfile(prev => prev ? { ...prev, pp: newPp } : null);
+        await loadRooms(userId);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [myProfile?.id, supabase, loadRooms]);
 
   // ── 방 선택 → 메시지 로드 + 실시간 구독 ────────────────────────
   useEffect(() => {
@@ -328,11 +360,11 @@ export default function ChatPage() {
         }, (payload: { new: any }) => {
           const u = payload.new;
           setSelectedRoom(prev => prev
-            ? { ...prev, name: u.name, icon: u.icon ?? null, announcement: u.announcement ?? null }
+            ? { ...prev, name: u.name, icon: u.icon ?? null, announcement: u.announcement ?? null, created_by: u.created_by ?? null }
             : null
           );
           setRooms(prev => prev.map(r => r.id === u.id
-            ? { ...r, name: u.name, icon: u.icon ?? null, announcement: u.announcement ?? null }
+            ? { ...r, name: u.name, icon: u.icon ?? null, announcement: u.announcement ?? null, created_by: u.created_by ?? null }
             : r
           ));
         })
@@ -454,6 +486,25 @@ export default function ChatPage() {
       return;
     }
 
+    // /promote 커맨드 (개설자 전용) S
+    if (trimmed.startsWith('/promote ') && _isCreator) {
+      const targetName = trimmed.slice(9).trim();
+      const targetMember = roomMembers.find(m => m.name === targetName);
+      if (!targetMember) {
+        alert(`'${targetName}' 사용자를 채팅방 멤버에서 찾을 수 없습니다.`);
+        setInput('');
+        return;
+      }
+      if (targetMember.user_id === myProfile.id) {
+        alert('자기 자신에게는 방장 권한을 양도할 수 없습니다.');
+        setInput('');
+        return;
+      }
+      setPromoteTarget(targetMember);
+      setInput('');
+      return;
+    }
+
     // /leave 커맨드 — 현재 방 나가기 S
     if (trimmed === '/leave') {
       await supabase.from('chat_room_members')
@@ -475,6 +526,19 @@ export default function ChatPage() {
     setInput('');
     setSending(false);
   }, [input, myProfile, selectedRoom, sending, supabase, loadRooms, roomMembers]);
+
+  // 방장 양도 확정 S
+  const handlePromoteConfirm = useCallback(async () => {
+    if (!promoteTarget || !selectedRoom || !myProfile) return;
+    await supabase.from('chat_rooms')
+      .update({ created_by: promoteTarget.user_id }).eq('id', selectedRoom.id);
+    await supabase.from('chat_messages').insert({
+      room_id: selectedRoom.id, author_id: myProfile.id,
+      content: `${promoteTarget.name}님이 새 방장이 되었습니다.`, is_system: true,
+    });
+    setSelectedRoom(prev => prev ? { ...prev, created_by: promoteTarget.user_id } : null);
+    setPromoteTarget(null);
+  }, [promoteTarget, selectedRoom, myProfile, supabase]);
 
   // ── 파일 업로드 ─────────────────────────────────────────────────
   const UPLOAD_MAX_BYTES  = 10 * 1024 * 1024;
@@ -634,7 +698,7 @@ export default function ChatPage() {
   const availableCmds = (() => {
     const cmds: string[] = [];
     if (selectedRoom?.is_support && myRank >= 1) cmds.push('/end');
-    if (isCreator) cmds.push('/kick', '/announcement');
+    if (isCreator) cmds.push('/kick', '/promote', '/announcement');
     cmds.push('/leave');
     return cmds;
   })();
@@ -1181,6 +1245,34 @@ export default function ChatPage() {
             >
               {creating ? '생성 중...' : '채팅방 만들기'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 방장 양도 확인 모달 ─────────────────────────────────────── */}
+      {promoteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-dark-surface rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <h2 className="font-bold text-gray-900 dark:text-white">방장 권한 양도</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-red-primary dark:text-yellow-primary">{promoteTarget.name}</span>
+              님에게 방장 권한을 양도하시겠습니까?<br />
+              양도 후 본인의 방장 권한은 사라집니다.
+            </p>
+            <div className="flex gap-3 mt-1">
+              <button
+                onClick={() => setPromoteTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-dark-border text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-dark-bg transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handlePromoteConfirm}
+                className="flex-1 py-2.5 rounded-xl bg-red-primary dark:bg-yellow-primary text-white dark:text-gray-900 font-semibold text-sm hover:bg-red-hover dark:hover:bg-yellow-hover transition-colors"
+              >
+                양도
+              </button>
+            </div>
           </div>
         </div>
       )}

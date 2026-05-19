@@ -2,12 +2,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_ROUTES = ['/', '/about', '/login', '/signup'];
+const PUBLIC_ROUTES = ['/', '/about', '/login', '/signup', '/help'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith('/api/')) return NextResponse.next({ request });
+  if (pathname.startsWith('/clubs/')) return NextResponse.next({ request });
 
   const response = NextResponse.next({ request });
 
@@ -20,9 +21,11 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          // request 쿠키도 갱신해야 토큰 갱신 시 하위 컴포넌트에서도 새 토큰을 볼 수 있음 S
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value, options);
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
@@ -51,10 +54,12 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // 공개 라우트 외 전체 페이지 — 로그인 필수
+  // 공개 라우트 외 전체 페이지 — 로그인 필수 (redirectTo로 복귀 경로 전달) S
   const isPublic = PUBLIC_ROUTES.includes(pathname);
   if (!isPublic && !user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const url = new URL('/login', request.url);
+    url.searchParams.set('redirectTo', pathname);
+    return NextResponse.redirect(url);
   }
 
   return response;

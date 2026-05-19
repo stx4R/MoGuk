@@ -30,6 +30,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-title" content="오량모의국회" />
+        {/* 우클릭/개발자도구 차단 — React 하이드레이션 전 동기 실행 S */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){
+const preventAction=function(e){e.preventDefault();e.stopPropagation();e.returnValue=false;};
+setInterval(function(){
+  if(document.oncontextmenu!==false){document.oncontextmenu=function(){return false;};window.oncontextmenu=function(){return false;};}
+},50);
+window.addEventListener('keydown',function(e){
+  var key=(e.key||'').toLowerCase();var kc=e.keyCode;
+  if(key==='f12'||kc===123){preventAction(e);}
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&['i','j','c','u'].includes(key)){preventAction(e);}
+  if((e.ctrlKey||e.metaKey)&&['s','p'].includes(key)){preventAction(e);}
+},true);
+document.addEventListener('contextmenu',preventAction,true);
+setInterval(function(){
+  var t=performance.now();
+  debugger;
+  if(performance.now()-t>100){void 0;}
+},100);
+})();` }} />
       </head>
       <body className="min-h-full flex flex-col bg-white dark:bg-dark-bg text-gray-900 dark:text-gray-100 transition-colors duration-300">
         <ThemeProvider>

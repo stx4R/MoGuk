@@ -1,8 +1,8 @@
 'use client';
 
 // 로그인 페이지 — 데스크탑 50:50, Material Design 라벨 애니메이션 S
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff, Scale, LogIn, AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -51,13 +51,31 @@ function FloatingInput({
   );
 }
 
+// Open Redirect 방지 화이트리스트 S
+const VALID_REDIRECT = new Set(['/vote', '/chat', '/about', '/help', '/admin-dashboard']);
+function safeRedirect(raw: string | null): string {
+  return raw && VALID_REDIRECT.has(raw) ? raw : '/';
+}
+
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState('');
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+  const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
-  const [showPw, setShowPw] = useState(false);
+  const [showPw, setShowPw]   = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError]     = useState('');
+
+  // 이미 로그인된 사용자는 바로 redirectTo 경로로 보냄 S
+  useEffect(() => {
+    const supabase = createClient();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION' && session) {
+        router.replace(safeRedirect(searchParams.get('redirectTo')));
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [router, searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +92,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/');
+    router.push(safeRedirect(searchParams.get('redirectTo')));
     router.refresh();
   };
 

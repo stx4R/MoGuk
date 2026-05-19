@@ -197,6 +197,37 @@ create or replace trigger on_auth_user_created
   for each row execute procedure public.handle_new_user();
 
 
+-- PP 변경 시 정당 채팅방 멤버십 자동 교체 S
+create or replace function public.handle_pp_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if old.pp is distinct from new.pp then
+    -- 기존 정당 채팅방 나가기
+    if old.pp is not null and old.pp != '무소속' then
+      delete from public.chat_room_members
+      where user_id = new.id
+        and room_id in (select id from public.chat_rooms where party_tag = old.pp);
+    end if;
+    -- 새 정당 채팅방 가입
+    if new.pp is not null and new.pp != '무소속' then
+      insert into public.chat_room_members (room_id, user_id)
+      select id, new.id from public.chat_rooms where party_tag = new.pp
+      on conflict do nothing;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger on_pp_change
+  after update of pp on public.profiles
+  for each row execute function public.handle_pp_change();
+
+
 -- -----------------------------------------------------------------
 -- 3. Helper Functions (RLS에서 사용)
 -- -----------------------------------------------------------------
@@ -854,6 +885,11 @@ alter publication supabase_realtime add table public.vote_result_broadcasts;
 --
 -- Step 6: Realtime 활성화
 -- alter publication supabase_realtime add table public.vote_result_broadcasts;
+--
+-- ── 특수방 + /promote + PP 변경 마이그레이션 ─────────────────────────────────
+--
+-- Step 7: PP 변경 트리거 등록 (신규 설치는 스킵, 기존 DB에만 실행)
+-- (위 2번 섹션의 handle_pp_change 함수 + on_pp_change 트리거 SQL 그대로 실행)
 
 -- -----------------------------------------------------------------
 -- 9. 초기 데이터 (테스트용 — 실제 운영 전 제거)

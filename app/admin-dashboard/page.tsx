@@ -194,14 +194,16 @@ export default function AdminDashboardPage() {
           .order('created_at', { ascending: false })
           .limit(10);
         if (bugsInit) {
-          setBugReports(bugsInit.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? '알 수 없음', resolved: b.resolved ?? false })));
+          setBugReports(bugsInit.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? (b.reporter_id ? '알 수 없음' : 'Guest'), resolved: b.resolved ?? false })));
         }
 
         bugCh = supabase.channel('bug-report-stream')
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bug_reports' }, async (payload: { new: any }) => {
             const row = payload.new;
-            const { data: p } = await supabase.from('profiles').select('name').eq('id', row.reporter_id).single();
-            setBugReports((prev: BugReport[]) => [{ ...row, reporter_name: p?.name ?? '알 수 없음', resolved: false }, ...prev].slice(0, 10));
+            const reporterName = row.reporter_id
+              ? ((await supabase.from('profiles').select('name').eq('id', row.reporter_id).single()).data?.name ?? '알 수 없음')
+              : 'Guest';
+            setBugReports((prev: BugReport[]) => [{ ...row, reporter_name: reporterName, resolved: false }, ...prev].slice(0, 10));
           })
           .subscribe();
       }
@@ -539,7 +541,7 @@ export default function AdminDashboardPage() {
       .select('id, title, description, category, created_at, resolved, profiles!reporter_id(name)')
       .order('created_at', { ascending: false });
     if (data) {
-      setAllBugReports(data.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? '알 수 없음', resolved: b.resolved ?? false })));
+      setAllBugReports(data.map((b: any) => ({ ...b, reporter_name: b.profiles?.name ?? (b.reporter_id ? '알 수 없음' : 'Guest'), resolved: b.resolved ?? false })));
     }
     setBugModalLoading(false);
   }, [supabase]);

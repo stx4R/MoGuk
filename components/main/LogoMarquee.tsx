@@ -1,6 +1,5 @@
 "use client";
 // 동아리 로고 무한 마키 — 원본 이미지 그대로, GPU 가속 끊김 없는 루프 S
-import Image from 'next/image';
 
 const CLUBS = [
   { src: '/clubs/dcn.jpg',                alt: 'DCN' },
@@ -23,13 +22,13 @@ function ClubList() {
     <div className="flex items-center gap-12 pr-12">
       {CLUBS.map((club, idx) => (
         <div key={idx} className="shrink-0 flex items-center justify-center w-24 h-16">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={club.src}
             alt={club.alt}
-            width={96}
-            height={64}
             className="object-contain w-full h-full"
             draggable={false}
+            loading="lazy"
           />
         </div>
       ))}

@@ -218,24 +218,16 @@ export default function VotePage() {
   }, [supabase]);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event !== 'INITIAL_SESSION') return;
+    let initialized = false;
 
-      if (!session) {
-        router.push('/login');
-        return;
-      }
-
+    // INITIAL_SESSION + SIGNED_IN 양쪽 처리 — 타이밍 문제로 INITIAL_SESSION이 null로 오더라도 SIGNED_IN으로 복구 S
+    const initPage = async (session: any) => {
+      if (initialized) return;
+      initialized = true;
       setIsLoggedIn(true);
-
       await loadAgendas();
-
-      // 내 투표 내역 로드
       const { data: votesData } = await supabase
-        .from('votes')
-        .select('agenda_id, choice')
-        .eq('user_id', session.user.id);
-
+        .from('votes').select('agenda_id, choice').eq('user_id', session.user.id);
       if (votesData) {
         const map: MyVoteMap = {};
         votesData.forEach((v: { agenda_id: string; choice: string }) => {
@@ -243,14 +235,18 @@ export default function VotePage() {
         });
         setMyVotes(map);
       }
-
       setLoading(false);
-
-      // 안건 변경 실시간 구독
       agendaChRef.current = supabase
         .channel('vote-page-agendas')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_items' }, loadAgendas)
         .subscribe();
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') { router.push('/login'); return; }
+      if (event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') return;
+      if (!session) { if (event === 'INITIAL_SESSION') router.push('/login'); return; }
+      await initPage(session);
     });
 
     return () => {

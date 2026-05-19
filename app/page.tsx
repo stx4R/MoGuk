@@ -13,7 +13,7 @@ export default function HomePage() {
         <ParliamentBackground />
 
         {/* 히어로 콘텐츠 */}
-        <div className="relative z-10 text-center max-w-4xl mx-auto">
+        <div className="relative z-10 text-center max-w-6xl mx-auto">
           {/* 배지 */}
           <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold bg-red-primary/10 text-red-primary dark:bg-yellow-primary/10 dark:text-yellow-primary border border-red-primary/20 dark:border-yellow-primary/20 mb-6 tracking-wider uppercase">
             <Scale size={12} />
@@ -21,14 +21,14 @@ export default function HomePage() {
           </span>
 
           {/* 메인 타이틀 */}
-          <h1 className="text-5xl max-md:text-3xl font-extrabold tracking-tight leading-tight mb-4">
+          <h1 className="text-8xl max-md:text-4xl font-extrabold tracking-tight leading-tight mb-6">
             <span className="text-gray-900 dark:text-gray-500">제 3회</span>{' '}
             <span className="text-gray-900 dark:text-white">오량</span>{' '}
             <span className="text-red-primary dark:text-yellow-primary">
               모의국회
             </span>
           </h1>
-          <p className="text-lg max-md:text-base text-gray-500 dark:text-gray-400 mb-10 max-w-xl mx-auto leading-relaxed">
+          <p className="text-2xl max-md:text-base text-gray-500 dark:text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
             보이지 않는 곳에서 
             <br className="max-md:hidden" />
             보이는 것을 위하여
