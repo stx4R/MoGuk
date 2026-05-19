@@ -6,7 +6,7 @@ export default function Footer() {
       <p className="mt-1">
         Developed by{' '}
         <a
-          href="https://stx4r.github.io/Portfolio/"
+          href="http://stx4r.me/"
           target="_blank"
           rel="noopener noreferrer"
           className="font-bold text-gray-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors"
