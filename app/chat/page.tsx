@@ -89,7 +89,13 @@ async function checkMagicBytes(file: File): Promise<boolean> {
                                        && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50;
   if (type === 'image/avif')       return b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70;
   if (type === 'application/pdf')  return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
-  if (type === 'text/plain')       return true;
+  // S-2 fix: text/plain도 실행파일 매직바이트 블랙리스트 검사
+  if (type === 'text/plain') {
+    const isMZ    = b[0] === 0x4D && b[1] === 0x5A;                                     // Windows PE
+    const isELF   = b[0] === 0x7F && b[1] === 0x45 && b[2] === 0x4C && b[3] === 0x46;  // Linux ELF
+    const isShebang = b[0] === 0x23 && b[1] === 0x21;                                   // #!/...
+    return !isMZ && !isELF && !isShebang;
+  }
   return false;
 }
 
@@ -345,8 +351,13 @@ export default function ChatPage() {
             setRoomMembers(prev => prev.filter(m => m.user_id !== payload.user_id));
           }
         })
-        .on('broadcast', { event: 'announcement_update' }, ({ payload }: { payload: { text: string } }) => {
-          setSelectedRoom(prev => prev ? { ...prev, announcement: payload.text } : null);
+        .on('broadcast', { event: 'announcement_update' }, async () => {
+          // S-1 fix: broadcast payload 신뢰 금지 — DB에서 실제 값 재조회 (위조 방어)
+          const { data } = await supabase
+            .from('chat_rooms').select('announcement').eq('id', selectedRoom!.id).single();
+          if (data !== undefined) {
+            setSelectedRoom(prev => prev ? { ...prev, announcement: data?.announcement ?? null } : null);
+          }
         })
         .subscribe();
 
@@ -476,6 +487,7 @@ export default function ChatPage() {
     if (trimmed.startsWith('/announcement ') && _isCreator) {
       const text = trimmed.slice(14).trim();
       if (!text) { setInput(''); return; }
+      if (text.length > 500) { alert('공지는 500자 이하여야 합니다.'); return; }
       await supabase.from('chat_rooms').update({ announcement: text }).eq('id', selectedRoom.id);
       await msgChRef.current?.send({
         type: 'broadcast', event: 'announcement_update',
@@ -563,7 +575,8 @@ export default function ChatPage() {
       return;
     }
     setUploading(true);
-    const path = `${selectedRoom.id}/${Date.now()}_${file.name}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${selectedRoom.id}/${Date.now()}_${safeName}`;
     const { data, error } = await supabase.storage
       .from('chat-files').upload(path, file, { upsert: true });
     if (!data || error) {
@@ -649,6 +662,7 @@ export default function ChatPage() {
   // ── 방 생성 ─────────────────────────────────────────────────────
   const handleCreateRoom = useCallback(async () => {
     if (!newRoomName.trim() || !myProfile || creating) return;
+    if (newRoomName.trim().length > 50) { alert('방 이름은 50자 이하여야 합니다.'); return; }
     setCreating(true);
     const { data: room, error: roomErr } = await supabase
       .from('chat_rooms')

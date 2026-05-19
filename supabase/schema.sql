@@ -408,9 +408,10 @@ create policy "개설자 또는 Admin만 채팅방 수정 가능"
   on public.chat_rooms for update to authenticated
   using (auth.uid() = created_by or public.is_admin());
 
+-- L-11: Mod도 is_support 방 삭제 가능 S
 create policy "개설자 또는 Admin만 채팅방 삭제 가능"
   on public.chat_rooms for delete to authenticated
-  using (auth.uid() = created_by or public.is_admin());
+  using (auth.uid() = created_by or public.is_admin() or (public.is_mod_or_admin() and is_support = true));
 
 -- chat_messages — JOIN 방식 재귀 제거, is_room_member() 사용 S
 create policy "방 멤버는 메시지 조회 가능"
@@ -420,13 +421,14 @@ create policy "방 멤버는 메시지 조회 가능"
     or exists (select 1 from public.chat_rooms where id = room_id and is_public = true)
   );
 
--- NH-3: is_system 필드는 Admin만 설정 가능 S
+-- NH-3: is_system은 Admin/Mod만 설정 가능, L-10: Rate Limit 추가 S
 create policy "방 멤버이고 미차단 상태면 메시지 전송 가능"
   on public.chat_messages for insert to authenticated
   with check (
     auth.uid() = author_id
     and not public.is_restricted()
-    and (is_system = false or public.is_admin())
+    and (is_system = false or public.is_mod_or_admin())
+    and public.check_chat_rate_limit()
     and exists (select 1 from public.chat_room_members where room_id = chat_messages.room_id and user_id = auth.uid())
     and (
       not exists (select 1 from public.chat_rooms where id = room_id and is_global = true)
@@ -474,6 +476,18 @@ $$;
 create policy "로그인 사용자 버그 제보 (Rate Limit 적용)"
   on public.bug_reports for insert to authenticated
   with check (public.check_bug_report_rate_limit());
+
+-- L-10: 채팅 메시지 Rate Limit — 1분에 30개 초과 차단 S
+create or replace function public.check_chat_rate_limit()
+returns boolean
+language sql
+security definer
+as $$
+  select count(*) < 30
+  from public.chat_messages
+  where author_id = auth.uid()
+    and created_at > now() - interval '1 minute';
+$$;
 
 create policy "비로그인 게스트 버그 제보 허용"
   on public.bug_reports for insert to anon
@@ -896,6 +910,19 @@ alter publication supabase_realtime add table public.vote_result_broadcasts;
 --
 -- Step 7: PP 변경 트리거 등록 (신규 설치는 스킵, 기존 DB에만 실행)
 -- (위 2번 섹션의 handle_pp_change 함수 + on_pp_change 트리거 SQL 그대로 실행)
+--
+-- ── L-10/L-11: 채팅 Rate Limit + Mod 권한 마이그레이션 ─────────────────────────
+--
+-- Step 8: chat_messages Rate Limit 함수 등록
+-- (위 check_chat_rate_limit 함수 SQL 그대로 실행)
+--
+-- Step 9: chat_messages INSERT 정책 재생성 (Rate Limit + is_mod_or_admin)
+-- drop policy if exists "방 멤버이고 미차단 상태면 메시지 전송 가능" on public.chat_messages;
+-- (위 chat_messages INSERT 정책 SQL 그대로 실행)
+--
+-- Step 10: chat_rooms DELETE 정책 재생성 (Mod + is_support)
+-- drop policy if exists "개설자 또는 Admin만 채팅방 삭제 가능" on public.chat_rooms;
+-- (위 chat_rooms DELETE 정책 SQL 그대로 실행)
 
 -- -----------------------------------------------------------------
 -- 9. 초기 데이터 (테스트용 — 실제 운영 전 제거)

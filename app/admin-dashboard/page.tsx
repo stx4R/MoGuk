@@ -78,7 +78,13 @@ async function checkMagicBytes(file: File): Promise<boolean> {
                                       && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50;
   if (type === 'image/avif')      return b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70;
   if (type === 'application/pdf') return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46;
-  if (type === 'text/plain')      return true;
+  // S-2 fix: text/plain도 실행파일 매직바이트 블랙리스트 검사
+  if (type === 'text/plain') {
+    const isMZ      = b[0] === 0x4D && b[1] === 0x5A;
+    const isELF     = b[0] === 0x7F && b[1] === 0x45 && b[2] === 0x4C && b[3] === 0x46;
+    const isShebang = b[0] === 0x23 && b[1] === 0x21;
+    return !isMZ && !isELF && !isShebang;
+  }
   return false;
 }
 
@@ -118,9 +124,19 @@ export default function AdminDashboardPage() {
   const isAdmin = myProfile?.role === 'admin';
   const isMod   = myProfile?.role === 'mod';
 
-  const adminUsers   = onlineUsers.filter((u: OnlineUser) => u.role === 'admin');
-  const modUsers     = onlineUsers.filter((u: OnlineUser) => u.role === 'mod');
-  const regularUsers = onlineUsers.filter((u: OnlineUser) => u.role === 'user');
+  const [onlineRoles, setOnlineRoles] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (!onlineUsers.length) { setOnlineRoles(new Map()); return; }
+    supabase.from('profiles').select('id, role').in('id', onlineUsers.map((u: OnlineUser) => u.user_id))
+      .then(({ data }: { data: { id: string; role: string }[] | null }) => {
+        if (data) setOnlineRoles(new Map(data.map((p: { id: string; role: string }) => [p.id, p.role])));
+      });
+  }, [onlineUsers, supabase]);
+
+  const adminUsers   = onlineUsers.filter((u: OnlineUser) => onlineRoles.get(u.user_id) === 'admin');
+  const modUsers     = onlineUsers.filter((u: OnlineUser) => onlineRoles.get(u.user_id) === 'mod');
+  const regularUsers = onlineUsers.filter((u: OnlineUser) => onlineRoles.get(u.user_id) === 'user' || !onlineRoles.has(u.user_id));
   const onlineCount  = onlineUsers.length;
 
   useEffect(() => {
@@ -422,6 +438,7 @@ export default function AdminDashboardPage() {
           : `${target.name} 의원을 영구 차단하시겠습니까?\n이 작업은 되돌리기 어렵습니다.`,
         onConfirm: async () => {
           if (cmd.type === 'kick') {
+            await supabase.rpc('admin_kick_user', { p_user_id: target.id });
             await fetch('/api/admin/kick', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -430,7 +447,6 @@ export default function AdminDashboardPage() {
             await supabase.channel(`user-control:${target.id}`).send({
               type: 'broadcast', event: 'force_signout', payload: { action: 'kick' },
             });
-            await supabase.rpc('admin_kick_user', { p_user_id: target.id });
           } else {
             await supabase.rpc('admin_ban_user', { p_user_id: target.id });
             await supabase.channel(`user-control:${target.id}`).send({
@@ -522,7 +538,8 @@ export default function AdminDashboardPage() {
     if (!UPLOAD_MIME_ALLOW.has(file.type)) { alert('허용되지 않는 파일 형식입니다.'); return; }
     if (!await checkMagicBytes(file)) { alert('파일 내용이 확장자와 일치하지 않습니다.'); return; }
     setUploading(true);
-    const path = `admin-chat/${Date.now()}_${file.name}`;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `admin-chat/${Date.now()}_${safeName}`;
     const { data, error } = await supabase.storage
       .from('chat-files').upload(path, file, { upsert: true });
     if (!data || error) { alert('파일 업로드 실패: ' + (error?.message ?? '알 수 없는 오류')); setUploading(false); return; }

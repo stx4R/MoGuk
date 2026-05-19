@@ -51,7 +51,6 @@ export default function UserSessionManager() {
             await presenceChannel!.track({
               user_id:   user.id,
               name:      profile.name,
-              role:      profile.role ?? 'user',
               pp:        profile.pp   ?? '무소속',
               online_at: new Date().toISOString(),
             });

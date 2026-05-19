@@ -238,6 +238,7 @@ export default function PIPChat() {
     if (trimmed.startsWith('/announcement ') && isCreator) {
       const text = trimmed.slice(14).trim();
       if (!text) { setInput(''); return; }
+      if (text.length > 500) { alert('공지는 500자 이하여야 합니다.'); return; }
       await supabase.from('chat_rooms').update({ announcement: text }).eq('id', pipRoomId);
       await msgChRef.current?.send({
         type: 'broadcast', event: 'announcement_update', payload: { text },
