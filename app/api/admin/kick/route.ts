@@ -2,8 +2,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { checkOrigin } from '@/lib/csrf';
 
 export async function POST(request: Request) {
+  if (!checkOrigin(request)) {
+    return NextResponse.json({ error: '잘못된 요청 출처' }, { status: 403 });
+  }
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -26,6 +31,17 @@ export async function POST(request: Request) {
 
   if (!targetUserId) {
     return NextResponse.json({ error: '대상 유저 ID 필요' }, { status: 400 });
+  }
+
+  // L-8 fix: 대상이 admin인지 확인 — admin끼리 강제 로그아웃 차단
+  const { data: targetProfile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', targetUserId)
+    .single();
+
+  if (targetProfile?.role === 'admin') {
+    return NextResponse.json({ error: '다른 관리자를 강제 로그아웃할 수 없습니다.' }, { status: 403 });
   }
 
   const admin = createAdminClient();

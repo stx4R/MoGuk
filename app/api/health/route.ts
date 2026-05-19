@@ -3,12 +3,21 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
-export async function GET() {
+export async function GET(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!url || !key) {
     return NextResponse.json({ status: 'env_missing' }, { status: 500 });
+  }
+
+  // L-9 fix: HEALTH_SECRET 설정 시 일치하지 않으면 상세 정보 비공개
+  const secret = process.env.HEALTH_SECRET;
+  if (secret) {
+    const provided = request.headers.get('x-health-secret');
+    if (provided !== secret) {
+      return NextResponse.json({ status: 'ok' });
+    }
   }
 
   try {

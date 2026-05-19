@@ -180,14 +180,20 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_name text;
 begin
+  v_name := trim(coalesce(new.raw_user_meta_data->>'name', ''));
+
+  -- P1 fix: Supabase Auth 직접 호출로 /api/auth/signup 우회 시 DB 레벨에서 차단
+  -- allowed_names에 없는 이름이면 트랜잭션 전체 롤백 → auth.users 생성도 취소됨
+  if not exists (select 1 from public.allowed_names where name = v_name) then
+    raise exception 'SIGNUP_NOT_ALLOWED: name not in allowed list';
+  end if;
+
   -- H-2 fix: role은 항상 'user'로 고정 — 메타데이터로 권한 상승 불가 S
   insert into public.profiles (id, name, role)
-  values (
-    new.id,
-    coalesce(new.raw_user_meta_data->>'name', split_part(new.email, '@', 1)),
-    'user'
-  );
+  values (new.id, v_name, 'user');
   return new;
 end;
 $$;

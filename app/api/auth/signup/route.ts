@@ -20,8 +20,13 @@ function checkRateLimit(ip: string): boolean {
 }
 
 export async function POST(request: Request) {
-  // Rate limit check
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
+  // M-2 fix: x-real-ip(Vercel) / cf-connecting-ip(Cloudflare) 우선 사용
+  // X-Forwarded-For 첫 번째 값은 클라이언트가 조작 가능하므로 마지막 hop 사용
+  const ip =
+    request.headers.get('x-real-ip') ??
+    request.headers.get('cf-connecting-ip') ??
+    request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() ??
+    'unknown';
   if (!checkRateLimit(ip)) {
     return NextResponse.json(
       { error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' },
@@ -30,7 +35,10 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json() as { email?: string; password?: string; name?: string };
-  const { email, password, name } = body;
+  // M-6 fix: 서버 측에서도 trim — 클라이언트 우회 시 공백 포함 이름 차단
+  const email    = body.email?.trim();
+  const password = body.password;
+  const name     = body.name?.trim();
 
   if (!email || !password || !name) {
     return NextResponse.json({ error: '모든 항목을 입력해주세요.' }, { status: 400 });

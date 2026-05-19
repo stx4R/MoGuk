@@ -1,5 +1,6 @@
 // 특수방(전체 공지방·정당 채팅방) 없으면 service key로 자동 생성 S
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 const SPECIAL_ROOMS = [
@@ -10,6 +11,17 @@ const SPECIAL_ROOMS = [
 ];
 
 export async function POST() {
+  // H-3 fix: 비인증 요청 차단 — Admin만 호출 가능
+  const userClient = await createClient();
+  const { data: { user } } = await userClient.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: '인증 필요' }, { status: 401 });
+  }
+  const { data: profile } = await userClient.from('profiles').select('role').eq('id', user.id).single();
+  if (profile?.role !== 'admin') {
+    return NextResponse.json({ error: '권한 없음' }, { status: 403 });
+  }
+
   const supabase = createAdminClient();
   const result: { globalRoomId: string | null; partyRoomIds: Record<string, string> } = {
     globalRoomId: null,
