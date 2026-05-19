@@ -11,7 +11,7 @@ export default function Footer() {
           rel="noopener noreferrer"
           className="font-bold text-gray-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400 transition-colors"
         >
-          st4R
+          stx4R
         </a>{' '}
         <a
           href="https://github.com/kmc11004"
