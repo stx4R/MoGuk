@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           // request 쿠키도 갱신해야 토큰 갱신 시 하위 컴포넌트에서도 새 토큰을 볼 수 있음 S
           cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value, options);
+            request.cookies.set(name, value);
             response.cookies.set(name, value, options);
           });
         },
