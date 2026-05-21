@@ -931,7 +931,12 @@ security definer
 set search_path = public
 as $$
 begin
-  -- name은 가입 이후 어떤 경로로도 변경 불가
+  -- Dashboard/Service Role 직접 접근(auth.uid() IS NULL)은 모든 제한 면제 S
+  if auth.uid() is null then
+    return new;
+  end if;
+
+  -- name은 가입 이후 클라이언트 경로로는 변경 불가
   new.name := old.name;
 
   -- 비관리자가 admin-only 필드를 건드리면 이전 값으로 강제 복원
