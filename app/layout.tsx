@@ -19,7 +19,12 @@ export const metadata: Metadata = {
   title: '제 3회 오량모의국회',
   description: '제 3회 오량모의국회 공식 웹사이트입니다.',
   icons: {
-    apple: '/apple-touch-icon.png',
+    apple: [{ url: '/apple-touch-icon.png', sizes: '512x512', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: '오량모의국회',
+    statusBarStyle: 'default',
   },
 };
 
@@ -27,9 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ko" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="오량모의국회" />
         {/* 우클릭/개발자도구 차단 — React 하이드레이션 전 동기 실행 S */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){
 const preventAction=function(e){e.preventDefault();e.stopPropagation();e.returnValue=false;};
