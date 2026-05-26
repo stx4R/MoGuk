@@ -132,3 +132,11 @@ body {
 .dark ::selection {
   background-color: rgba(241, 196, 15, 0.25);
 }
+
+/* 동아리 로고 — 배경 투명화 후 그레이스케일 적용 H */
+.club-logo {
+  filter: grayscale(100%) opacity(0.65);
+}
+.dark .club-logo {
+  filter: grayscale(100%) invert(1) opacity(0.75);
+}
