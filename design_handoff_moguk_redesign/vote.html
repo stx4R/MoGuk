@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>안건 투표 · 오량모의국회</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="moguk.css" />
+<style>
+  .page { max-width: var(--maxw); margin: 0 auto; padding: 36px 24px 60px; }
+  .page-head { margin-bottom: 28px; }
+  .page-head h1 { font-family: var(--font-title); font-size: 30px; font-weight: 800; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .page-head p { color: var(--text-secondary); font-size: 14px; margin: 0; }
+
+  .vote-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+
+  /* ----- agenda list ----- */
+  .agenda-list { background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px; padding: 8px; position: sticky; top: 84px; }
+  .agenda-list .lh { font-size: 11px; font-weight: 700; color: #6f6f6f; text-transform: uppercase; letter-spacing: 0.12em; padding: 12px 14px 8px; }
+  .a-item { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; background: none; border: none; cursor: pointer; padding: 13px 14px; border-radius: 11px; transition: background-color 160ms; }
+  .a-item:hover { background: var(--surface-hover); }
+  .a-item[aria-selected="true"] { background: rgba(30,215,96,0.14); }
+  .a-item .a-main { flex: 1; min-width: 0; }
+  .a-item .a-title { font-size: 14px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .a-item[aria-selected="true"] .a-title { color: var(--green); }
+  .a-item .a-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .a-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .a-dot.open { background: var(--green); box-shadow: 0 0 8px rgba(30,215,96,0.6); animation: pulse 1.6s infinite; }
+  .a-dot.wait { background: #555; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+  /* phone agenda scroller */
+  .agenda-scroller { display: none; }
+
+  /* ----- detail ----- */
+  .detail { background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px; padding: 32px; min-height: 460px; display: flex; flex-direction: column; }
+  .status { align-self: flex-start; display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; margin-bottom: 20px; white-space: nowrap; }
+  .status.open { background: rgba(30,215,96,0.14); color: var(--green); }
+  .status.wait { background: rgba(255,255,255,0.07); color: var(--text-secondary); }
+  .status .sd { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 1.6s infinite; }
+  .detail h2 { font-family: var(--font-title); font-size: 24px; font-weight: 800; margin: 0 0 14px; line-height: 1.25; }
+  .detail .accent-bar { width: 44px; height: 4px; border-radius: 999px; background: var(--green); margin-bottom: 22px; }
+  .detail .desc { font-size: 14px; color: var(--text-near-white); line-height: 1.75; border-left: 2px solid rgba(30,215,96,0.3); padding-left: 16px; white-space: pre-line; margin: 0 0 32px; }
+
+  .vote-area { margin-top: auto; }
+  .vote-hint { text-align: center; font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; }
+  .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .choice {
+    display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 24px 12px;
+    background: var(--surface-2); border: 1.5px solid transparent; border-radius: 16px; cursor: pointer;
+    color: var(--text-secondary); font-weight: 700; font-size: 15px;
+    transition: transform 150ms, border-color 150ms, color 150ms, background-color 150ms;
+  }
+  .choice:hover { transform: translateY(-2px); }
+  .choice[data-c="yes"]:hover { border-color: var(--yes); color: var(--yes); }
+  .choice[data-c="no"]:hover { border-color: var(--no); color: var(--no); }
+  .choice[data-c="abstain"]:hover { border-color: var(--abstain); color: #cfcfcf; }
+  .choice .ci { width: 28px; height: 28px; }
+
+  .vote-state { background: var(--surface-2); border-radius: 16px; padding: 30px; text-align: center; }
+  .vote-state .vi { margin: 0 auto 12px; color: #5a5a5a; }
+  .vote-state .vt { font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+  .vote-state.done .done-check { width: 44px; height: 44px; border-radius: 50%; background: var(--green); display: grid; place-items: center; margin: 0 auto 14px; }
+  .vote-state.done .done-check svg { width: 24px; height: 24px; stroke: #000; stroke-width: 3; fill: none; }
+  .vote-state.done .small { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+  .vote-state.done .choice-label { font-size: 22px; font-weight: 800; }
+  .choice-label.yes { color: var(--yes); } .choice-label.no { color: var(--no); } .choice-label.abstain { color: #cfcfcf; }
+
+  @media (max-width: 560px) {
+    .page { padding: 24px 16px 48px; }
+    .page-head h1 { font-size: 24px; }
+    .vote-layout { grid-template-columns: 1fr; gap: 16px; }
+    .agenda-list { display: none; }
+    .agenda-scroller { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 -2px; scrollbar-width: none; }
+    .agenda-scroller::-webkit-scrollbar { display: none; }
+    .a-pill { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px; background: var(--surface-2); border: none; color: var(--text-secondary); font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+    .a-pill[aria-selected="true"] { background: rgba(30,215,96,0.16); color: var(--green); }
+    .detail { padding: 24px 20px; min-height: 0; }
+    .detail h2 { font-size: 20px; }
+    .choices { grid-template-columns: 1fr; gap: 10px; }
+    .choice { flex-direction: row; justify-content: center; padding: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header" id="hdr">
+  <div class="bar">
+    <a class="brand" href="main.html"><span class="emblem"><img src="assets/moguk_logo.svg" alt="" /></span> 오량모의국회</a>
+    <nav>
+      <a class="navlink" href="main.html">홈</a>
+      <a class="navlink" href="main.html#about">소개</a>
+      <a class="navlink active" href="vote.html">투표</a>
+      <a class="navlink" href="dashboard.html">대시보드</a>
+      <a class="btn btn-green btn-sm" href="login.html" style="margin-left:8px;">로그인</a>
+    </nav>
+    <button class="hamburger" id="hbtn" aria-label="메뉴"><i data-lucide="menu"></i></button>
+  </div>
+  <div class="mobile-menu"><nav>
+    <a class="navlink" href="main.html">홈</a>
+    <a class="navlink" href="main.html#about">소개</a>
+    <a class="navlink active" href="vote.html">투표</a>
+    <a class="navlink" href="dashboard.html">대시보드</a>
+    <a class="navlink" href="login.html" style="color:var(--green);">로그인</a>
+  </nav></div>
+</header>
+
+<div class="page">
+  <div class="page-head">
+    <h1>안건 투표</h1>
+    <p>좌측에서 안건을 선택한 후 의사를 표명하세요. 제출 후에는 변경할 수 없습니다.</p>
+  </div>
+
+  <div class="vote-layout">
+    <aside class="agenda-list" id="agendaList">
+      <div class="lh">안건 목록 <span id="agendaCount"></span></div>
+    </aside>
+
+    <div class="agenda-scroller" id="agendaScroller"></div>
+
+    <section class="detail" id="detail"></section>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  const AGENDAS = [
+    { id:'a1', title:'제1호 · 청소년 정치 참여 연령 하향', open:true,
+      desc:'선거권 및 피선거권 연령을 만 16세로 하향하는 안건입니다.\n청소년의 정치적 의사 표현 기회를 확대하고, 정책 수요자의 목소리를 직접 반영하기 위한 취지로 발의되었습니다.' },
+    { id:'a2', title:'제2호 · 학교 내 스마트기기 사용 규정', open:true,
+      desc:'수업 중 스마트기기 사용을 원칙적으로 제한하되, 교육 목적의 사용은 교사 재량으로 허용하는 안건입니다.\n학습 집중도와 디지털 리터러시 사이의 균형을 고려합니다.' },
+    { id:'a3', title:'제3호 · 기후위기 대응 탄소세 도입', open:true,
+      desc:'탄소 배출량에 비례한 세금을 부과하고, 세수를 친환경 산업 전환에 재투자하는 안건입니다.\n기후에너지환경부 발의.' },
+    { id:'a4', title:'제4호 · AI 창작물 저작권 귀속', open:false,
+      desc:'인공지능이 생성한 창작물의 저작권 귀속 주체를 명확히 하는 안건입니다.\n방송미디어통신위원회에서 상정 예정입니다.' },
+    { id:'a5', title:'제5호 · 주 4일제 시범 도입', open:false,
+      desc:'공공부문을 대상으로 주 4일 근무제를 시범 도입하는 안건입니다.\n고용노동부에서 상정 예정입니다.' },
+  ];
+  const LABEL = { yes:'찬성', no:'반대', abstain:'기권' };
+  const myVotes = {}; // id -> choice
+  let selected = AGENDAS[0].id;
+
+  const listEl = document.getElementById('agendaList');
+  const scrollerEl = document.getElementById('agendaScroller');
+  const detailEl = document.getElementById('detail');
+  document.getElementById('agendaCount').textContent = `(${AGENDAS.length})`;
+
+  function renderList() {
+    // desktop sidebar
+    listEl.querySelectorAll('.a-item').forEach(n => n.remove());
+    AGENDAS.forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'a-item';
+      b.setAttribute('aria-selected', a.id === selected);
+      b.innerHTML = `<div class="a-main"><div class="a-title">${a.title}</div>
+        <div class="a-sub">${a.open ? '투표 진행 중' : '대기 중'}${myVotes[a.id] ? ' · 투표 완료' : ''}</div></div>
+        <span class="a-dot ${a.open ? 'open' : 'wait'}"></span>`;
+      b.addEventListener('click', () => { selected = a.id; render(); });
+      listEl.appendChild(b);
+    });
+    // phone scroller
+    scrollerEl.innerHTML = '';
+    AGENDAS.forEach((a, i) => {
+      const b = document.createElement('button');
+      b.className = 'a-pill';
+      b.setAttribute('aria-selected', a.id === selected);
+      b.innerHTML = `<span class="a-dot ${a.open ? 'open':'wait'}"></span> 제${i+1}호`;
+      b.addEventListener('click', () => { selected = a.id; render(); });
+      scrollerEl.appendChild(b);
+    });
+  }
+
+  function renderDetail() {
+    const a = AGENDAS.find(x => x.id === selected);
+    const voted = myVotes[a.id];
+    let voteArea;
+    if (voted) {
+      voteArea = `<div class="vote-state done">
+        <div class="done-check"><svg viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="small">투표가 완료되었습니다</div>
+        <div class="choice-label ${voted}">${LABEL[voted]}</div></div>`;
+    } else if (!a.open) {
+      voteArea = `<div class="vote-state"><div class="vi"><i data-lucide="clock" style="width:28px;height:28px;"></i></div>
+        <div class="vt">투표가 아직 시작되지 않았습니다.</div></div>`;
+    } else {
+      voteArea = `<p class="vote-hint">의사를 선택하세요. 제출 후 변경할 수 없습니다.</p>
+        <div class="choices">
+          <button class="choice" data-c="yes"><i class="ci" data-lucide="check-circle-2"></i>찬성</button>
+          <button class="choice" data-c="no"><i class="ci" data-lucide="x-circle"></i>반대</button>
+          <button class="choice" data-c="abstain"><i class="ci" data-lucide="minus-circle"></i>기권</button>
+        </div>`;
+    }
+    detailEl.innerHTML = `
+      <span class="status ${a.open ? 'open' : 'wait'}">
+        ${a.open ? '<span class="sd"></span> 투표 진행 중' : '<i data-lucide="clock" style="width:12px;height:12px;"></i> 투표 대기 중'}
+      </span>
+      <h2>${a.title.replace(' · ', '<br>')}</h2>
+      <div class="accent-bar"></div>
+      <div class="desc">${a.desc}</div>
+      <div class="vote-area">${voteArea}</div>`;
+    detailEl.querySelectorAll('.choice').forEach(c => c.addEventListener('click', () => {
+      myVotes[a.id] = c.dataset.c; render();
+    }));
+    lucide.createIcons();
+  }
+
+  function render() { renderList(); renderDetail(); }
+  render();
+
+  const hbtn = document.getElementById('hbtn'), hdr = document.getElementById('hdr');
+  hbtn?.addEventListener('click', () => hdr.classList.toggle('mobile-open'));
+  hdr.querySelectorAll('.mobile-menu a').forEach(a => a.addEventListener('click', () => hdr.classList.remove('mobile-open')));
+  lucide.createIcons();
+</script>
+</body>
+</html>

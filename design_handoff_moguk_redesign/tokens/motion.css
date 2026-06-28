@@ -1,0 +1,17 @@
+/* ============================================================
+   MOTION — Spotify transitions are quick and subtle.
+   Hover lightens; press scales down slightly on controls.
+   ============================================================ */
+
+:root {
+  --ease-standard: cubic-bezier(0.3, 0, 0, 1);  /* @kind other */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);    /* @kind other */
+  --dur-fast: 100ms;   /* @kind other */
+  --dur-base: 200ms;   /* @kind other */
+  --dur-slow: 300ms;   /* @kind other */
+
+  /* Common transitions */
+  --transition-bg: background-color var(--dur-base) var(--ease-standard);      /* @kind other */
+  --transition-transform: transform var(--dur-fast) var(--ease-standard);      /* @kind other */
+  --transition-color: color var(--dur-base) var(--ease-standard);              /* @kind other */
+}

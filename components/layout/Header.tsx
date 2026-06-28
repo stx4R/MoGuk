@@ -9,8 +9,6 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
 
-const STAFF_ROLES = new Set(['admin', 'mod']);
-
 type Profile = { name: string; role: string; pp: string };
 
 const ROLE_BADGE: Record<string, { bg: string; text: string }> = {
@@ -76,11 +74,8 @@ export default function Header() {
   const roleBadge = profile ? (ROLE_BADGE[profile.role] ?? ROLE_BADGE.user) : null;
   const ppBadge   = profile ? (PP_BADGE[profile.pp]   ?? PP_BADGE['무소속']) : null;
   const displayName = profile?.name ?? user?.email?.split('@')[0] ?? '';
-  const isStaff = user && profile && STAFF_ROLES.has(profile.role);
 
   const navLinks = [
-    { label: '홈',   href: '/' },
-    { label: '소개', href: '/#about' },
     { label: '투표', href: '/vote' },
   ];
 
@@ -116,14 +111,6 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
-          {isStaff && (
-            <Link
-              href="/admin-dashboard"
-              className="px-3.5 py-2 rounded-full text-sm font-semibold text-text-secondary hover:text-text-base transition-colors duration-150"
-            >
-              대시보드
-            </Link>
-          )}
         </nav>
 
         {/* Auth area */}
@@ -193,15 +180,6 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
-            {isStaff && (
-              <Link
-                href="/admin-dashboard"
-                onClick={() => setMobileOpen(false)}
-                className="px-4 py-3 text-sm font-semibold text-text-secondary hover:text-text-base rounded-full hover:bg-surface-hover transition-colors"
-              >
-                대시보드
-              </Link>
-            )}
 
             {user ? (
               <div className="flex items-center gap-2 px-4 py-3">

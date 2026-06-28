@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>제 3회 오량모의국회</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="moguk.css" />
+<style>
+  /* ---------- HERO ---------- */
+  .hero {
+    position: relative; min-height: 86vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; overflow: hidden;
+    padding: 80px 24px 64px;
+  }
+  .hero .glow { position: absolute; border-radius: 50%; filter: blur(120px); pointer-events: none; }
+  .hero .glow.g1 { width: 460px; height: 460px; background: rgba(30,215,96,0.12); top: 18%; left: 50%; transform: translateX(-60%); }
+  .hero .glow.g2 { width: 320px; height: 320px; background: rgba(83,157,245,0.08); bottom: 8%; right: 22%; }
+  .hero-inner { position: relative; z-index: 2; max-width: 940px; }
+  .hero h1 {
+    font-family: var(--font-title); font-weight: 800; letter-spacing: -0.03em;
+    font-size: clamp(44px, 9vw, 104px); line-height: 1.02; margin: 22px 0 0;
+  }
+  .hero h1 .dim { color: #6f6f6f; }
+  .hero h1 .accent { color: var(--green); }
+  .hero h1 .w { white-space: nowrap; }
+  .hero .badge.badge-green { white-space: nowrap; }
+  .hero .sub { color: var(--text-secondary); font-size: clamp(16px, 2.4vw, 22px); line-height: 1.6; margin: 26px 0 38px; }
+  .hero .ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .scroll-cue { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); color: #5a5a5a; animation: bob 1.8s ease-in-out infinite; z-index: 2; }
+  @keyframes bob { 0%,100% { transform: translate(-50%,0); } 50% { transform: translate(-50%,8px); } }
+
+  /* ---------- STAT BAND ---------- */
+  .stat-band { border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline); background: var(--surface); }
+  .stat-grid { max-width: var(--maxw); margin: 0 auto; padding: 44px 24px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+  .stat { text-align: center; position: relative; }
+  .stat .num { font-family: var(--font-title); font-size: clamp(32px, 4.6vw, 50px); font-weight: 800; letter-spacing: -0.02em; }
+  .stat .lbl { color: var(--text-secondary); font-size: 13px; font-weight: 500; margin-top: 4px; }
+
+  /* ---------- CLUBS MARQUEE ---------- */
+  .clubs { padding: 44px 0; background: var(--bg-base); border-bottom: 1px solid var(--hairline); overflow: hidden; }
+  .clubs .eyebrow { text-align: center; color: #6f6f6f; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; font-weight: 700; margin-bottom: 28px; }
+  .marquee { position: relative; display: flex; overflow: hidden; }
+  .marquee::before, .marquee::after { content: ""; position: absolute; top: 0; bottom: 0; width: 90px; z-index: 2; pointer-events: none; }
+  .marquee::before { left: 0; background: linear-gradient(90deg, var(--bg-base), transparent); }
+  .marquee::after { right: 0; background: linear-gradient(270deg, var(--bg-base), transparent); }
+  .marquee-track { display: flex; align-items: center; gap: 56px; width: max-content; animation: marquee 38s linear infinite; }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .marquee-track img { height: 34px; width: auto; object-fit: contain; filter: grayscale(100%) brightness(0) invert(1); opacity: 0.55; transition: opacity 200ms; }
+  .marquee-track img:hover { opacity: 1; }
+
+  /* ---------- ABOUT: OVERVIEW ---------- */
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px 28px; color: var(--text-secondary); font-size: 14px; }
+  .meta-row b { color: #6f6f6f; font-weight: 600; }
+
+  /* ---------- TIMELINE ---------- */
+  .timeline { position: relative; }
+  .timeline .spine { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--hairline); transform: translateX(-0.5px); }
+  .tl-row { position: relative; display: grid; grid-template-columns: 1fr 40px 1fr; gap: 28px; align-items: center; margin-bottom: 26px; }
+  .tl-card { display: inline-block; background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 18px 20px; max-width: 340px; }
+  .tl-card .date { display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: rgba(30,215,96,0.14); color: var(--green); margin-bottom: 8px; }
+  .tl-card .name { font-weight: 700; font-size: 15px; }
+  .tl-card .desc { color: var(--text-secondary); font-size: 13px; margin-top: 4px; line-height: 1.5; }
+  .tl-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--bg-base); border: 2px solid var(--green); justify-self: center; box-shadow: 0 0 12px rgba(30,215,96,0.4); z-index: 2; }
+  .tl-left .tl-card { float: right; }
+
+  /* ---------- DEPARTMENTS ---------- */
+  .dept-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .dept { position: relative; background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 22px 20px; transition: border-color 240ms, transform 240ms; }
+  .dept:hover { border-color: rgba(30,215,96,0.4); transform: translateY(-3px); }
+  .dept .name { font-weight: 800; font-size: 15px; }
+  .dept .desc { color: var(--text-secondary); font-size: 13px; line-height: 1.55; margin: 8px 0 16px; }
+  .dept .people { display: flex; flex-direction: column; gap: 7px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+  .dept .person { display: flex; justify-content: space-between; gap: 10px; }
+  .dept .person .k { font-size: 10px; color: #6f6f6f; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+  .dept .person .v { font-size: 12px; color: var(--text-near-white); text-align: right; }
+
+  /* ---------- PARTIES ---------- */
+  .party-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .party { background: var(--surface); border: 1px solid var(--hairline); border-radius: 16px; padding: 26px 24px; border-top-width: 3px; }
+  .party.jinbo { border-top-color: var(--jinbo); }
+  .party.bosu { border-top-color: var(--bosu); }
+  .party.jungdo { border-top-color: var(--jungdo); }
+  .party .top { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .party .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .party.jinbo .dot { background: var(--jinbo); } .party.bosu .dot { background: var(--bosu); } .party.jungdo .dot { background: var(--jungdo); }
+  .party .pname { font-weight: 800; font-size: 18px; }
+  .party .count { margin-left: auto; font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; }
+  .party.jinbo .count { background: rgba(83,157,245,0.15); color: var(--jinbo); }
+  .party.bosu .count { background: rgba(243,114,127,0.15); color: var(--bosu); }
+  .party.jungdo .count { background: rgba(255,255,255,0.08); color: var(--jungdo); }
+  .party .field { margin-top: 10px; }
+  .party .field .k { font-size: 10px; color: #6f6f6f; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 2px; }
+  .party .field .v { font-size: 14px; color: var(--text-near-white); }
+
+  /* ---------- PROCESS ---------- */
+  .process { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; position: relative; }
+  .proc { text-align: center; padding: 0 8px; }
+  .proc .num { width: 44px; height: 44px; border-radius: 50%; background: var(--green); color: #000; font-weight: 800; font-size: 16px; display: grid; place-items: center; margin: 0 auto 16px; box-shadow: 0 0 20px rgba(30,215,96,0.3); }
+  .proc .pname { font-weight: 700; font-size: 15px; }
+  .proc .date { color: var(--green); font-size: 12px; font-weight: 700; margin: 4px 0 8px; }
+  .proc .desc { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
+
+  /* ---------- CONTACT ---------- */
+  .contact-wrap { display: flex; gap: 64px; flex-wrap: wrap; }
+  .bigname { font-family: var(--font-title); font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-size: clamp(54px, 9vw, 108px); display: inline-block; transition: filter 220ms, transform 220ms; }
+  .bigname:hover { filter: drop-shadow(0 0 30px rgba(30,215,96,0.5)); transform: scale(1.015); }
+  .bigname .accent { color: var(--green); }
+  .contact-links { margin-top: 30px; display: flex; flex-direction: column; gap: 14px; }
+  .contact-links a { display: flex; align-items: center; gap: 12px; color: var(--text-secondary); font-size: 14px; font-weight: 500; transition: color 180ms; }
+  .contact-links a:hover { color: #fff; }
+  .contact-links .ic { width: 34px; height: 34px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--hairline); display: grid; place-items: center; flex-shrink: 0; }
+  .socials { display: flex; flex-wrap: wrap; gap: 12px; align-content: flex-start; }
+  .social { display: inline-flex; align-items: center; gap: 9px; padding: 13px 18px; border-radius: 14px; font-size: 13px; font-weight: 700; color: #fff; transition: transform 180ms, filter 180ms; }
+  .social:hover { transform: scale(1.04); filter: brightness(1.08); }
+  .social.ig { background: linear-gradient(135deg, #f77737, #e1306c, #833ab4); }
+  .social.dc { background: #5865F2; }
+  .social.tg { background: #229ED9; }
+
+  /* reveal */
+  .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ---------- PHONE ---------- */
+  @media (max-width: 560px) {
+    .hero { min-height: 78vh; padding: 56px 18px 40px; }
+    .hero .ctas { flex-direction: column; width: 100%; max-width: 320px; margin: 0 auto; }
+    .hero .ctas .btn { width: 100%; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 28px 16px; padding: 36px 18px; }
+    .timeline .spine { left: 18px; }
+    .tl-row { grid-template-columns: 36px 1fr; gap: 16px; margin-bottom: 18px; }
+    .tl-row .tl-dot { grid-row: 1; grid-column: 1; }
+    .tl-left .tl-card, .tl-right .tl-card { float: none; max-width: none; }
+    .tl-row .tl-card { grid-column: 2; }
+    .tl-row .empty { display: none; }
+    .dept-grid { grid-template-columns: 1fr; }
+    .party-grid { grid-template-columns: 1fr; }
+    .process { grid-template-columns: 1fr; gap: 24px; }
+    .proc { display: grid; grid-template-columns: 44px 1fr; gap: 14px; text-align: left; align-items: start; }
+    .proc .num { margin: 0; }
+    .contact-wrap { gap: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="app-header" id="hdr">
+  <div class="bar">
+    <a class="brand" href="main.html">
+      <span class="emblem"><img src="assets/moguk_logo.svg" alt="" /></span>
+      오량모의국회
+    </a>
+    <nav>
+      <a class="navlink active" href="main.html">홈</a>
+      <a class="navlink" href="#about">소개</a>
+      <a class="navlink" href="vote.html">투표</a>
+      <a class="navlink" href="dashboard.html">대시보드</a>
+      <a class="btn btn-green btn-sm" href="login.html" style="margin-left:8px;">로그인</a>
+    </nav>
+    <button class="hamburger" id="hbtn" aria-label="메뉴"><i data-lucide="menu"></i></button>
+  </div>
+  <div class="mobile-menu">
+    <nav>
+      <a class="navlink" href="main.html">홈</a>
+      <a class="navlink" href="#about">소개</a>
+      <a class="navlink" href="vote.html">투표</a>
+      <a class="navlink" href="dashboard.html">대시보드</a>
+      <a class="navlink" href="login.html" style="color:var(--green);">로그인</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <span class="glow g1"></span><span class="glow g2"></span>
+  <div class="hero-inner">
+    <span class="badge badge-green" style="font-size:11px; letter-spacing:0.12em; padding:7px 14px;">
+      <i data-lucide="scale" style="width:13px;height:13px;"></i> 2026 정책기반 사회문제 해결 프로젝트
+    </span>
+    <h1><span class="w"><span class="dim">제 3회</span> 오량</span> <span class="w accent">모의국회</span></h1>
+    <p class="sub">보이지 않는 곳에서<br />보이는 것을 위하여</p>
+    <div class="ctas">
+      <a class="btn btn-green btn-lg" href="vote.html"><i data-lucide="gavel" style="width:17px;height:17px;"></i> 안건 투표하기</a>
+      <a class="btn btn-outlined btn-lg" href="#about"><i data-lucide="scroll-text" style="width:17px;height:17px;"></i> 프로그램 안내</a>
+    </div>
+  </div>
+  <a href="#about" class="scroll-cue"><i data-lucide="chevron-down" style="width:26px;height:26px;"></i></a>
+</section>
+
+<!-- ===== STAT BAND ===== -->
+<div class="stat-band">
+  <div class="stat-grid">
+    <div class="stat"><div class="num" data-count="100" data-suffix="명">0</div><div class="lbl">총 참가자</div></div>
+    <div class="stat"><div class="num" data-count="9" data-suffix="개">0</div><div class="lbl">부처</div></div>
+    <div class="stat"><div class="num" data-count="36" data-suffix="명">0</div><div class="lbl">운영진</div></div>
+    <div class="stat"><div class="num" data-count="58" data-suffix="일">0</div><div class="lbl">활동 기간</div></div>
+  </div>
+</div>
+
+<!-- ===== CLUBS ===== -->
+<div class="clubs">
+  <p class="eyebrow">참여 동아리</p>
+  <div class="marquee">
+    <div class="marquee-track" id="mtrack"></div>
+  </div>
+</div>
+
+<!-- ===== ABOUT: OVERVIEW ===== -->
+<section class="section section-narrow" id="about">
+  <div class="wrap reveal">
+    <div class="section-head">
+      <span class="badge-eyebrow">대회 개요</span>
+      <h2>제 3회 오량모의국회</h2>
+    </div>
+    <div class="meta-row">
+      <span><b>장소 · </b>대전대신고등학교</span>
+      <span><b>기간 · </b>2026.05.29 ~ 2026.07.25</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TIMELINE ===== -->
+<section class="section section-narrow" style="padding-top:0;">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="badge-eyebrow">전체 일정</span>
+      <h2>활동 타임라인</h2>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="spine"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== DEPARTMENTS ===== -->
+<section class="section">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="badge-eyebrow">참가자 구성</span>
+      <h2>상임위원회 소개</h2>
+    </div>
+    <div class="dept-grid" id="deptGrid"></div>
+  </div>
+</section>
+
+<!-- ===== PARTIES ===== -->
+<section class="section section-narrow" style="padding-top:0;">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="badge-eyebrow">정당 구성</span>
+      <h2>3당 체제</h2>
+    </div>
+    <div class="party-grid">
+      <div class="party jinbo reveal">
+        <div class="top"><span class="dot"></span><span class="pname">진보</span><span class="count">40명</span></div>
+        <div class="field"><div class="k">당대표</div><div class="v">김동하</div></div>
+        <div class="field"><div class="k">이념</div><div class="v">친 학생·노동자·외곽</div></div>
+      </div>
+      <div class="party bosu reveal">
+        <div class="top"><span class="dot"></span><span class="pname">보수</span><span class="count">40명</span></div>
+        <div class="field"><div class="k">당대표</div><div class="v">정재욱</div></div>
+        <div class="field"><div class="k">이념</div><div class="v">친 학교·기업·도심</div></div>
+      </div>
+      <div class="party jungdo reveal">
+        <div class="top"><span class="dot"></span><span class="pname">중도</span><span class="count">50명</span></div>
+        <div class="field"><div class="k">당대표</div><div class="v">황성연</div></div>
+        <div class="field"><div class="k">이념</div><div class="v">개인별 상이</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PROCESS ===== -->
+<section class="section section-narrow" style="padding-top:0;">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="badge-eyebrow">활동 과정</span>
+      <h2>활동 흐름</h2>
+    </div>
+    <div class="process" id="process"></div>
+  </div>
+</section>
+
+<!-- ===== CONTACT ===== -->
+<section class="section section-narrow" style="padding-top:0;">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <span class="badge-eyebrow">Contact</span>
+      <h2>Feel Free to Contact.</h2>
+    </div>
+    <div class="contact-wrap reveal">
+      <div>
+        <a class="bigname" href="https://stx4r.me" target="_blank" rel="noopener">stx<span class="accent">4</span>R</a>
+        <div class="contact-links">
+          <a href="mailto:suppuding@gmail.com"><span class="ic"><i data-lucide="mail" style="width:14px;height:14px;"></i></span> suppuding@gmail.com</a>
+          <a href="tel:+821021001648"><span class="ic"><i data-lucide="phone" style="width:14px;height:14px;"></i></span> +82 10-2100-1648</a>
+        </div>
+      </div>
+      <div class="socials">
+        <a class="social ig" href="https://www.instagram.com/stx4r_" target="_blank" rel="noopener"><i data-lucide="instagram" style="width:15px;height:15px;"></i> Instagram</a>
+        <a class="social dc" href="#"><i data-lucide="message-circle" style="width:15px;height:15px;"></i> Discord <span style="opacity:0.7;font-weight:400;">gunfire_reborn</span></a>
+        <a class="social tg" href="https://t.me/8615943006" target="_blank" rel="noopener"><i data-lucide="send" style="width:15px;height:15px;"></i> Telegram</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="app-footer">
+  <div class="inner">
+    <div class="footer-cols">
+      <div class="footer-col footer-brandcol">
+        <a class="brand" href="main.html"><span class="emblem"><img src="assets/moguk_logo.svg" alt="" /></span> 오량모의국회</a>
+        <p class="footer-lead">본 웹앱은 제 3회 오량모의국회 전자투표 플랫폼입니다.</p>
+      </div>
+      <div class="footer-col">
+        <h4><a class="topic" href="#">서비스</a></h4>
+        <ul>
+          <li><a href="#">주요 기능</a></li>
+          <li><a href="#">시작하기</a></li>
+          <li><a href="#">둘러보기</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4><a class="topic" href="#">지원</a></h4>
+        <ul>
+          <li><a href="mailto:suppuding@gmail.com">문의 이메일</a></li>
+          <li><a href="#">자주 묻는 질문</a></li>
+          <li><a href="#">오류 제보</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4><a class="topic" href="#">정책</a></h4>
+        <ul>
+          <li><a href="#">이용약관</a></li>
+          <li><a href="#">개인정보 처리방침</a></li>
+          <li><a href="#">운영정책</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 김윤철 팬클럽 및 제 3회 오량모의국회 전자투표 플랫폼</p>
+      <p>대표 <a href="https://github.com/stx4R" target="_blank" rel="noopener">stx4R</a> · 크루 kmc11004, heejae0105</p>
+    </div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  // ---- data ----
+  const CLUBS = ['dcn','doyl','flow-communicators','nalssam','one-press','path-finder','inspire','gyojiphap','eunoia','right-us','unify','link'];
+  const TIMELINE = [
+    { date:'05/18 ~ 05/21', name:'참가자 모집', desc:'각 동아리별 참가자 모집' },
+    { date:'05/29 (금)', name:'개회식', desc:'대전대신고에서 공식 개회' },
+    { date:'05.29 ~ 07.19', name:'탐구·멘토링', desc:'정책 탐구 및 구체화, Zoom 멘토링' },
+    { date:'07/18 (토)', name:'상임위원회', desc:'안건 심의·토론 / 대전대신고' },
+    { date:'07/25 (토)', name:'본회의', desc:'제안설명 → 질의/토론 → 전자 투표 → 시상' },
+  ];
+  const DEPTS = [
+    { name:'법무부', chair:'조연재', evaluator:'이주환', desc:'법 제도 개혁' },
+    { name:'방송미디어통신위원회', chair:'김준혁', evaluator:'장재원', desc:'방송의 규제 기준 개정' },
+    { name:'교육부', chair:'김도엽', evaluator:'강민찬', desc:'다문화 교육, 중·고등 교육 정책 수립' },
+    { name:'고용노동부', chair:'고원세', evaluator:'김지후C', desc:'미래 노동환경 변화 대응 노동정책' },
+    { name:'중소벤처기업부', chair:'조승찬', evaluator:'기호준', desc:'중소기업의 보호와 육성' },
+    { name:'기후에너지환경부', chair:'김지후B', evaluator:'이건희', desc:'미래 산업 에너지 정책 수립' },
+    { name:'행정안전부', chair:'서지후', evaluator:'오시훈', desc:'국가 행정 정책 수립' },
+    { name:'재정경제부', chair:'노승민', evaluator:'강원우', desc:'국가 재정·경제·국제 금융 대응' },
+    { name:'외교부', chair:'김영광', evaluator:'유하연, 백다경', desc:'중견국 외교 전략 수립' },
+  ];
+  const PROCESS = [
+    { num:1, name:'의안 탐구', date:'05.29 ~ 07.18', desc:'상임위 주제 조사·구체화' },
+    { num:2, name:'의안 제출', date:'상임위 전', desc:'피드백·자구심사 후 안건 확정' },
+    { num:3, name:'상임위원회', date:'07.18 (토)', desc:'안건 심의·토론 후 본회의 상정' },
+    { num:4, name:'본회의', date:'07.25 (월)', desc:'제안설명 → 토론 → 전자 투표 → 시상' },
+  ];
+
+  // ---- render clubs (doubled for loop) ----
+  const mt = document.getElementById('mtrack');
+  [...CLUBS, ...CLUBS].forEach(c => {
+    const img = document.createElement('img');
+    img.src = `assets/clubs/${c}.png`; img.alt = c;
+    mt.appendChild(img);
+  });
+
+  // ---- render timeline ----
+  const tl = document.getElementById('timeline');
+  TIMELINE.forEach((t, i) => {
+    const left = i % 2 === 0;
+    const row = document.createElement('div');
+    row.className = 'tl-row reveal ' + (left ? 'tl-left' : 'tl-right');
+    const card = `<div class="tl-card"><span class="date">${t.date}</span><div class="name">${t.name}</div><div class="desc">${t.desc}</div></div>`;
+    row.innerHTML = left
+      ? `<div>${card}</div><div class="tl-dot"></div><div class="empty"></div>`
+      : `<div class="empty"></div><div class="tl-dot"></div><div>${card}</div>`;
+    tl.appendChild(row);
+  });
+
+  // ---- render departments ----
+  const dg = document.getElementById('deptGrid');
+  DEPTS.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'dept reveal';
+    el.innerHTML = `<div class="name">${d.name}</div><div class="desc">${d.desc}</div>
+      <div class="people">
+        <div class="person"><span class="k">상임위원장</span><span class="v">${d.chair}</span></div>
+        <div class="person"><span class="k">평가위원</span><span class="v">${d.evaluator}</span></div>
+      </div>`;
+    dg.appendChild(el);
+  });
+
+  // ---- render process ----
+  const pg = document.getElementById('process');
+  PROCESS.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'proc reveal';
+    el.innerHTML = `<div class="num">${p.num}</div><div><div class="pname">${p.name}</div><div class="date">${p.date}</div><div class="desc">${p.desc}</div></div>`;
+    pg.appendChild(el);
+  });
+
+  lucide.createIcons();
+
+  // ---- hamburger ----
+  const hbtn = document.getElementById('hbtn');
+  const hdr = document.getElementById('hdr');
+  hbtn?.addEventListener('click', () => hdr.classList.toggle('mobile-open'));
+  hdr.querySelectorAll('.mobile-menu a').forEach(a => a.addEventListener('click', () => hdr.classList.remove('mobile-open')));
+
+  // ---- scroll reveal ----
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ---- count up ----
+  const cio = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const el = e.target, target = +el.dataset.count, suffix = el.dataset.suffix || '';
+      const start = performance.now(), dur = 1400;
+      const tick = (now) => {
+        const p = Math.min((now - start) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.round(target * eased) + suffix;
+        if (p < 1) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+      cio.unobserve(el);
+    });
+  }, { threshold: 0.5 });
+  document.querySelectorAll('.num[data-count]').forEach(el => cio.observe(el));
+</script>
+</body>
+</html>

@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
 import {
   Landmark, Hammer, FileText, ChevronDown,
-  Mail, Phone, Camera, Send, MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -456,81 +455,6 @@ export default function HomePage() {
             </Reveal>
           ))}
         </div>
-      </section>
-
-      {/* ── Contact ──────────────────────────────────────────── */}
-      <section id="contact" className="px-6 pb-28 max-w-[920px] mx-auto">
-        <Reveal className="mb-12">
-          <SectionEyebrow>Contact</SectionEyebrow>
-          <SectionTitle>Feel Free to Contact.</SectionTitle>
-        </Reveal>
-        <Reveal>
-          <div className="flex flex-wrap gap-16">
-            {/* Name + links */}
-            <div>
-              <a
-                href="https://stx4r.me"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-extrabold tracking-[-0.03em] leading-none inline-block hover:[filter:drop-shadow(0_0_30px_rgba(30,215,96,0.5))] hover:scale-[1.015] transition-all duration-220"
-                style={{ fontSize: 'clamp(54px, 9vw, 108px)' }}
-              >
-                stx<span className="text-green">4</span>R
-              </a>
-              <div className="mt-7 flex flex-col gap-3.5">
-                <a
-                  href="mailto:suppuding@gmail.com"
-                  className="flex items-center gap-3 text-[14px] font-medium text-text-secondary hover:text-text-base transition-colors duration-150"
-                >
-                  <span className="w-[34px] h-[34px] rounded-[9px] bg-surface-2 border border-[var(--hairline)] flex items-center justify-center shrink-0">
-                    <Mail size={14} />
-                  </span>
-                  suppuding@gmail.com
-                </a>
-                <a
-                  href="tel:+821021001648"
-                  className="flex items-center gap-3 text-[14px] font-medium text-text-secondary hover:text-text-base transition-colors duration-150"
-                >
-                  <span className="w-[34px] h-[34px] rounded-[9px] bg-surface-2 border border-[var(--hairline)] flex items-center justify-center shrink-0">
-                    <Phone size={14} />
-                  </span>
-                  +82 10-2100-1648
-                </a>
-              </div>
-            </div>
-
-            {/* Socials */}
-            <div className="flex flex-wrap gap-3 content-start">
-              <a
-                href="https://www.instagram.com/stx4r_"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2.5 px-4 py-3 rounded-[14px] text-[13px] font-bold text-white hover:scale-[1.04] hover:brightness-110 transition-all duration-180"
-                style={{ background: 'linear-gradient(135deg, #f77737, #e1306c, #833ab4)' }}
-              >
-                <Camera size={15} />
-                Instagram
-              </a>
-              <a
-                href="#"
-                className="inline-flex items-center gap-2.5 px-4 py-3 rounded-[14px] text-[13px] font-bold text-white hover:scale-[1.04] hover:brightness-110 transition-all duration-180 bg-[#5865F2]"
-              >
-                <MessageCircle size={15} />
-                Discord{' '}
-                <span className="opacity-70 font-normal">gunfire_reborn</span>
-              </a>
-              <a
-                href="https://t.me/8615943006"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2.5 px-4 py-3 rounded-[14px] text-[13px] font-bold text-white hover:scale-[1.04] hover:brightness-110 transition-all duration-180 bg-[#229ED9]"
-              >
-                <Send size={15} />
-                Telegram
-              </a>
-            </div>
-          </div>
-        </Reveal>
       </section>
     </>
   );

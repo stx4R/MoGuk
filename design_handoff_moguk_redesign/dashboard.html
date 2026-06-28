@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>관리자 대시보드 · 오량모의국회</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="moguk.css" />
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  .dash { height: 100vh; display: grid; grid-template-columns: 230px 1fr 340px; gap: 8px; padding: 8px; background: #000; }
+  .panel { background: var(--surface); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
+
+  /* ---- nav rail ---- */
+  .rail { padding: 18px 14px; gap: 6px; }
+  .rail .brand { padding: 4px 8px 18px; font-size: 16px; }
+  .rail .navitem { display: flex; align-items: center; gap: 14px; padding: 11px 12px; border-radius: 10px; color: var(--text-secondary); font-weight: 700; font-size: 14px; cursor: pointer; background: none; border: none; width: 100%; text-align: left; transition: color 160ms, background-color 160ms; }
+  .rail .navitem:hover { color: #fff; }
+  .rail .navitem.active { color: #fff; background: var(--surface-2); }
+  .rail .navitem .badge-count { margin-left: auto; background: var(--no); color: #fff; font-size: 11px; font-weight: 800; min-width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; padding: 0 5px; }
+  .rail .spacer { flex: 1; }
+  .rail .me { display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-top: 1px solid var(--hairline); }
+  .rail .me .av { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg,#34e979,#14b84e); display: grid; place-items: center; color: #000; font-weight: 800; font-size: 14px; }
+  .rail .me .nm { font-size: 13px; font-weight: 700; }
+  .rail .me .rl { font-size: 11px; color: var(--no); font-weight: 700; }
+
+  /* ---- main ---- */
+  .main { }
+  .main .scroll { overflow-y: auto; padding: 24px 28px 28px; }
+  .main-head { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+  .main-head h1 { font-family: var(--font-title); font-size: 26px; font-weight: 800; margin: 0; letter-spacing: -0.02em; }
+  .main-head .btn { margin-left: auto; }
+
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 26px; }
+  .kpi { background: var(--surface-2); border-radius: 12px; padding: 16px 18px; }
+  .kpi .k { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+  .kpi .v { font-family: var(--font-title); font-size: 28px; font-weight: 800; margin-top: 4px; }
+  .kpi .v small { font-size: 14px; color: var(--text-secondary); font-weight: 600; }
+
+  .sec-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 14px; }
+
+  .agenda-card { background: var(--surface-2); border-radius: 14px; padding: 18px 20px; margin-bottom: 12px; transition: background-color 200ms; }
+  .agenda-card:hover { background: #2a2a2a; }
+  .ac-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .ac-title { font-weight: 700; font-size: 15px; flex: 1 1 60%; min-width: 180px; }
+  .ac-state { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+  .ac-state.open { background: rgba(30,215,96,0.15); color: var(--green); }
+  .ac-state.wait { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+  .ac-state.done { background: rgba(83,157,245,0.15); color: var(--jinbo); }
+  .ac-actions { margin-left: auto; display: flex; gap: 6px; }
+  .icon-btn { width: 32px; height: 32px; border-radius: 50%; border: none; background: transparent; color: var(--text-secondary); cursor: pointer; display: grid; place-items: center; transition: background-color 160ms, color 160ms; }
+  .icon-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .bars { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: grid; grid-template-columns: 36px 1fr 64px; align-items: center; gap: 10px; font-size: 12px; }
+  .bar-row .bl { font-weight: 700; }
+  .bar-row .bl.yes { color: var(--yes); } .bar-row .bl.no { color: var(--no); } .bar-row .bl.ab { color: var(--abstain); }
+  .bar-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,0.07); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; transition: width 700ms var(--ease-out); }
+  .bar-fill.yes { background: var(--yes); } .bar-fill.no { background: var(--no); } .bar-fill.ab { background: var(--abstain); }
+  .bar-row .bc { text-align: right; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .ac-meta { font-size: 12px; color: var(--text-secondary); margin-top: 12px; }
+
+  /* ---- right column (tabs: users / chat) ---- */
+  .right .tabs { display: flex; gap: 4px; padding: 12px 12px 0; }
+  .tab { flex: 1; padding: 9px; border-radius: 9px; background: none; border: none; color: var(--text-secondary); font-weight: 700; font-size: 13px; cursor: pointer; }
+  .tab.active { background: var(--surface-2); color: #fff; }
+  .tabpane { flex: 1; min-height: 0; display: none; flex-direction: column; }
+  .tabpane.active { display: flex; }
+
+  /* online users */
+  .calls { padding: 12px; }
+  .call { display: flex; align-items: center; gap: 10px; background: rgba(255,164,43,0.08); border: 1px solid rgba(255,164,43,0.25); border-radius: 12px; padding: 10px 12px; }
+  .call .cb { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,164,43,0.18); display: grid; place-items: center; color: var(--warning); }
+  .call .ct { flex: 1; } .call .ct .cn { font-size: 13px; font-weight: 700; } .call .ct .cm { font-size: 11px; color: var(--text-secondary); }
+  .users { overflow-y: auto; padding: 6px 12px 14px; }
+  .ugroup { margin-top: 12px; }
+  .ugroup .gh { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 6px; }
+  .ugroup.admin .gh { color: var(--no); } .ugroup.mod .gh { color: var(--warning); } .ugroup.user .gh { color: var(--green); }
+  .urow { display: flex; align-items: center; gap: 10px; padding: 8px 6px; border-radius: 8px; }
+  .urow:hover { background: var(--surface-2); }
+  .udot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .ugroup.admin .udot { background: var(--no); } .ugroup.mod .udot { background: var(--warning); } .ugroup.user .udot { background: var(--green); }
+  .uname { flex: 1; font-size: 13px; color: var(--text-near-white); }
+  .pp { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+  .pp.jinbo { background: rgba(83,157,245,0.15); color: var(--jinbo); }
+  .pp.bosu { background: rgba(243,114,127,0.15); color: var(--no); }
+  .pp.jungdo { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
+  .pp.none { background: rgba(255,255,255,0.06); color: #888; }
+
+  /* chat */
+  .chat { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .chat-head { padding: 12px 14px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--hairline); }
+  .chat-head .ct { font-size: 13px; font-weight: 700; }
+  .chat-head .pv { margin-left: auto; font-size: 11px; color: #666; }
+  .messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .msg .mh { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .msg .mn { font-size: 12px; font-weight: 800; }
+  .msg .mn.admin { color: var(--no); } .msg .mn.mod { color: var(--warning); } .msg .mn.user { color: var(--green); }
+  .msg .mt { font-size: 11px; color: #666; }
+  .msg .cmd-tag { font-size: 10px; font-family: monospace; background: rgba(255,164,43,0.12); color: var(--warning); padding: 1px 5px; border-radius: 4px; }
+  .msg .mb { font-size: 13px; background: var(--surface-2); color: var(--text-near-white); padding: 8px 12px; border-radius: 12px 12px 12px 4px; max-width: 90%; display: inline-block; line-height: 1.5; }
+  .msg .mb.cmd { background: rgba(255,164,43,0.1); color: var(--warning); font-family: monospace; }
+  .chat-input-wrap { position: relative; padding: 10px; border-top: 1px solid var(--hairline); }
+  .cmd-pop { position: absolute; left: 10px; right: 10px; bottom: 100%; margin-bottom: 6px; background: var(--surface-card); border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-heavy); display: none; }
+  .cmd-pop.show { display: block; }
+  .cmd-pop button { width: 100%; text-align: left; padding: 10px 14px; background: none; border: none; cursor: pointer; font-family: monospace; font-size: 13px; color: var(--green); border-bottom: 1px solid var(--hairline); }
+  .cmd-pop button:last-child { border-bottom: none; }
+  .cmd-pop button:hover { background: var(--surface-2); }
+  .cmd-pop button .hint { color: #666; margin-left: 8px; font-size: 11px; }
+  .chat-form { display: flex; gap: 8px; align-items: center; }
+  .chat-form input { flex: 1; background: var(--surface-2); border: none; border-radius: 999px; padding: 11px 16px; color: #fff; font-size: 13px; outline: none; }
+  .chat-form input:focus { box-shadow: #fff 0 0 0 1px inset; }
+  .chat-send { width: 40px; height: 40px; border-radius: 50%; border: none; background: var(--green); color: #000; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+
+  /* modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 90; padding: 20px; }
+  .modal-bg.show { display: flex; }
+  .modal { background: var(--surface-card); border-radius: 16px; width: 100%; max-width: 440px; box-shadow: var(--shadow-heavy); overflow: hidden; }
+  .modal-h { display: flex; align-items: center; gap: 8px; padding: 18px 20px; border-bottom: 1px solid var(--hairline); }
+  .modal-h .mt { font-weight: 800; flex: 1; }
+  .modal-h .x { background: none; border: none; color: var(--text-secondary); cursor: pointer; }
+  .modal-b { padding: 20px; }
+  .modal-b label { display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin: 0 0 7px; }
+  .modal-b input, .modal-b textarea { width: 100%; background: var(--surface-2); border: none; border-radius: 10px; padding: 11px 14px; color: #fff; font-size: 14px; font-family: var(--font-ui); outline: none; margin-bottom: 16px; }
+  .modal-b textarea { resize: none; min-height: 96px; }
+  .modal-b input:focus, .modal-b textarea:focus { box-shadow: var(--green) 0 0 0 1px inset; }
+  .modal-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 0 20px 20px; }
+  .confirm-body { padding: 22px 20px; display: flex; gap: 12px; }
+  .confirm-body .wi { color: var(--warning); flex-shrink: 0; }
+  .confirm-body .ct { font-weight: 800; font-size: 14px; margin-bottom: 4px; }
+  .confirm-body .cd { font-size: 13px; color: var(--text-secondary); line-height: 1.6; white-space: pre-line; }
+
+  /* mobile tab bar */
+  .mtabbar { display: none; }
+
+  @media (max-width: 560px) {
+    html, body { overflow: auto; }
+    .dash { grid-template-columns: 1fr; height: auto; min-height: 100vh; padding: 0 0 64px; gap: 0; }
+    .rail { display: none; }
+    .panel { border-radius: 0; }
+    .main .scroll { padding: 18px 16px 24px; }
+    .kpis { grid-template-columns: 1fr 1fr; }
+    .kpis .kpi:last-child { grid-column: 1 / -1; }
+    /* show only active mobile view */
+    .dash[data-m="manage"] .right, .dash[data-m="people"] .main { display: none; }
+    .dash[data-m="manage"] .main, .dash[data-m="people"] .right { display: flex; }
+    .right { height: auto; }
+    .users { max-height: none; }
+    .messages { max-height: 50vh; }
+    .mtabbar { display: flex; position: fixed; bottom: 0; left: 0; right: 0; background: rgba(18,18,18,0.95); backdrop-filter: blur(12px); border-top: 1px solid var(--hairline); z-index: 60; }
+    .mtabbar button { flex: 1; padding: 10px; background: none; border: none; color: var(--text-secondary); font-size: 11px; font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+    .mtabbar button.active { color: var(--green); }
+  }
+</style>
+</head>
+<body>
+
+<div class="dash" id="dash" data-m="manage">
+
+  <!-- nav rail -->
+  <aside class="panel rail">
+    <a class="brand" href="main.html"><span class="emblem"><img src="assets/moguk_logo.svg" alt="" /></span> 오량모의국회</a>
+    <button class="navitem active"><i data-lucide="bar-chart-2"></i> 투표 관리</button>
+    <button class="navitem"><i data-lucide="message-square"></i> 스태프 채팅</button>
+    <button class="navitem"><i data-lucide="users"></i> 접속자</button>
+    <button class="navitem"><i data-lucide="bug"></i> 버그 제보 <span class="badge-count">3</span></button>
+    <button class="navitem"><i data-lucide="megaphone"></i> 공지</button>
+    <div class="spacer"></div>
+    <button class="navitem"><i data-lucide="log-out"></i> 로그아웃</button>
+    <div class="me">
+      <div class="av">S</div>
+      <div><div class="nm">stx4R</div><div class="rl">Admin</div></div>
+    </div>
+  </aside>
+
+  <!-- main: agenda management -->
+  <main class="panel main">
+    <div class="scroll">
+      <div class="main-head">
+        <h1>투표 관리</h1>
+        <button class="btn btn-green" id="newBtn"><i data-lucide="plus" style="width:16px;height:16px;"></i> 새 투표</button>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="k">진행 중 안건</div><div class="v">3</div></div>
+        <div class="kpi"><div class="k">총 투표 수</div><div class="v">233<small> 표</small></div></div>
+        <div class="kpi"><div class="k">평균 참여율</div><div class="v">78<small>%</small></div></div>
+      </div>
+
+      <p class="sec-title">안건 목록</p>
+      <div id="agendaCards"></div>
+    </div>
+  </main>
+
+  <!-- right: tabs users/chat -->
+  <aside class="panel right">
+    <div class="tabs">
+      <button class="tab active" data-tab="users">접속자 <span id="onCount"></span></button>
+      <button class="tab" data-tab="chat">스태프 채팅</button>
+    </div>
+
+    <!-- users pane -->
+    <div class="tabpane active" data-pane="users">
+      <div class="calls">
+        <div class="call">
+          <span class="cb"><i data-lucide="bell" style="width:15px;height:15px;"></i></span>
+          <div class="ct"><div class="cn">김도엽 호출</div><div class="cm">14:21 · 지원 요청</div></div>
+          <button class="btn btn-green btn-sm">참가</button>
+        </div>
+      </div>
+      <div class="users" id="users"></div>
+    </div>
+
+    <!-- chat pane -->
+    <div class="tabpane" data-pane="chat">
+      <div class="chat">
+        <div class="chat-head"><i data-lucide="shield" style="width:14px;height:14px;color:var(--no);"></i> <span class="ct">관리자 전용 채널</span> <span class="pv">Private</span></div>
+        <div class="messages" id="messages"></div>
+        <div class="chat-input-wrap">
+          <div class="cmd-pop" id="cmdPop"></div>
+          <form class="chat-form" id="chatForm">
+            <input id="chatInput" placeholder='메시지 또는 /명령어 "인자"' maxlength="500" autocomplete="off" />
+            <button class="chat-send" type="submit"><i data-lucide="send" style="width:16px;height:16px;"></i></button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- mobile tab bar -->
+<nav class="mtabbar">
+  <button data-m="manage" class="active"><i data-lucide="bar-chart-2" style="width:20px;height:20px;"></i> 투표 관리</button>
+  <button data-m="people"><i data-lucide="users" style="width:20px;height:20px;"></i> 접속자 · 채팅</button>
+</nav>
+
+<!-- create modal -->
+<div class="modal-bg" id="createModal">
+  <div class="modal">
+    <div class="modal-h"><i data-lucide="vote" style="width:16px;height:16px;color:var(--green);"></i> <span class="mt">새 투표 생성</span> <button class="x" id="createX"><i data-lucide="x" style="width:18px;height:18px;"></i></button></div>
+    <div class="modal-b">
+      <label>투표 제목 <span style="color:var(--no)">*</span></label>
+      <input id="newTitle" placeholder="예: 제6호 안건" maxlength="100" />
+      <label>세부사항 <span style="color:var(--no)">*</span></label>
+      <textarea id="newDesc" placeholder="투표할 사항에 대한 세부 내용을 입력하세요." maxlength="2000"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-dark btn-sm" id="createCancel">취소</button>
+      <button class="btn btn-green btn-sm" id="createSubmit">생성하기</button>
+    </div>
+  </div>
+</div>
+
+<!-- confirm modal -->
+<div class="modal-bg" id="confirmModal">
+  <div class="modal">
+    <div class="confirm-body">
+      <span class="wi"><i data-lucide="alert-triangle" style="width:22px;height:22px;"></i></span>
+      <div><div class="ct" id="cfTitle"></div><div class="cd" id="cfBody"></div></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-dark btn-sm" id="cfCancel">취소</button>
+      <button class="btn btn-green btn-sm" id="cfOk">확인</button>
+    </div>
+  </div>
+</div>
+
+<!-- results modal -->
+<div class="modal-bg" id="resultModal">
+  <div class="modal">
+    <div class="modal-h"><span class="mt" id="rmTitle"></span> <button class="x" id="rmX"><i data-lucide="x" style="width:18px;height:18px;"></i></button></div>
+    <div class="modal-b" id="rmBody"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>
+  const TOTAL_USERS = 100;
+  let agendas = [
+    { id:'a1', title:'제1호 · 청소년 정치 참여 연령 하향', state:'open', yes:32, no:41, abstain:12 },
+    { id:'a2', title:'제2호 · 학교 내 스마트기기 사용 규정', state:'open', yes:28, no:30, abstain:9 },
+    { id:'a3', title:'제3호 · 기후위기 대응 탄소세 도입', state:'open', yes:51, no:22, abstain:8 },
+    { id:'a4', title:'제4호 · AI 창작물 저작권 귀속', state:'wait', yes:0, no:0, abstain:0 },
+    { id:'a5', title:'제2회 · 본회의 의장단 선출', state:'done', yes:64, no:21, abstain:7 },
+  ];
+  const USERS = {
+    admin: [{ n:'stx4R', pp:'none' }],
+    mod: [{ n:'kmc11004', pp:'jungdo' }, { n:'heejae0105', pp:'jinbo' }],
+    user: [{ n:'김동하', pp:'jinbo' }, { n:'정재욱', pp:'bosu' }, { n:'황성연', pp:'jungdo' }, { n:'조연재', pp:'bosu' }, { n:'김도엽', pp:'jinbo' }, { n:'고원세', pp:'jungdo' }, { n:'노승민', pp:'bosu' }, { n:'김영광', pp:'jinbo' }],
+  };
+  const PP_LABEL = { jinbo:'진보', bosu:'보수', jungdo:'중도', none:'무소속' };
+  const COMMANDS = [
+    { c:'/kick', h:'"사용자명"' }, { c:'/ban', h:'"사용자명"' }, { c:'/timeout', h:'"사용자명" "초"' },
+    { c:'/announcement', h:'"내용"' }, { c:'/voteresult', h:'"투표 제목"' },
+  ];
+
+  // ---- agenda cards ----
+  const cardsEl = document.getElementById('agendaCards');
+  function tot(a) { return a.yes + a.no + a.abstain; }
+  function pct(v, t) { return t ? Math.round(v / t * 100) : 0; }
+  function renderCards() {
+    cardsEl.innerHTML = '';
+    agendas.forEach(a => {
+      const t = tot(a);
+      const stateLabel = { open:'진행 중', wait:'대기', done:'완료' }[a.state];
+      const card = document.createElement('div');
+      card.className = 'agenda-card';
+      const actions = a.state === 'done'
+        ? `<button class="icon-btn" data-act="result" title="결과"><i data-lucide="eye" style="width:16px;height:16px;"></i></button>`
+        : `<button class="icon-btn" data-act="toggle" title="${a.state==='open'?'닫기':'열기'}"><i data-lucide="${a.state==='open'?'pause':'play'}" style="width:16px;height:16px;"></i></button>
+           <button class="icon-btn" data-act="result" title="결과"><i data-lucide="bar-chart-2" style="width:16px;height:16px;"></i></button>
+           <button class="icon-btn" data-act="complete" title="완료"><i data-lucide="check-circle-2" style="width:16px;height:16px;"></i></button>`;
+      const bars = ['yes','no','abstain'].map(k => {
+        const lbl = { yes:'찬성', no:'반대', abstain:'기권' }[k];
+        const cls = { yes:'yes', no:'no', abstain:'ab' }[k];
+        return `<div class="bar-row"><span class="bl ${cls}">${lbl}</span>
+          <span class="bar-track"><span class="bar-fill ${cls}" style="width:${pct(a[k],t)}%"></span></span>
+          <span class="bc">${a[k]}표 · ${pct(a[k],t)}%</span></div>`;
+      }).join('');
+      card.innerHTML = `<div class="ac-top">
+          <span class="ac-title">${a.title}</span>
+          <span class="ac-state ${a.state}">${stateLabel}</span>
+          <span class="ac-actions">${actions}</span>
+        </div>
+        ${ a.state==='wait' ? '<div class="ac-meta">아직 투표가 시작되지 않았습니다.</div>' : `<div class="bars">${bars}</div><div class="ac-meta">참여 ${t}명 / ${TOTAL_USERS}명 · ${pct(t,TOTAL_USERS)}%</div>` }`;
+      card.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => action(b.dataset.act, a)));
+      cardsEl.appendChild(card);
+    });
+    lucide.createIcons();
+  }
+
+  function action(act, a) {
+    if (act === 'toggle') {
+      const opening = a.state !== 'open';
+      confirmAction(
+        opening ? `"${a.title.split(' · ')[0]}" 투표 열기` : `"${a.title.split(' · ')[0]}" 투표 닫기`,
+        opening ? '투표를 시작하시겠습니까?\n모든 의원이 투표할 수 있게 됩니다.' : '투표를 일시 중단하시겠습니까?\n언제든 다시 열 수 있습니다.',
+        () => { a.state = opening ? 'open' : 'wait'; renderCards(); }
+      );
+    } else if (act === 'complete') {
+      confirmAction(`"${a.title.split(' · ')[0]}" 투표 완료`,
+        '투표를 완료 처리하시겠습니까?\n완료 후 데이터는 잠기며 투표 탭에서 숨겨집니다.\n이 작업은 되돌릴 수 없습니다.',
+        () => { a.state = 'done'; renderCards(); });
+    } else if (act === 'result') {
+      openResult(a);
+    }
+  }
+
+  // ---- users ----
+  const usersEl = document.getElementById('users');
+  let onlineCount = USERS.admin.length + USERS.mod.length + USERS.user.length;
+  document.getElementById('onCount').textContent = `(${onlineCount})`;
+  function renderUsers() {
+    const groups = [['admin','Admin'],['mod','Mod'],['user','User']];
+    usersEl.innerHTML = groups.map(([key,label]) => `
+      <div class="ugroup ${key}">
+        <div class="gh">${label} · ${USERS[key].length}</div>
+        ${USERS[key].map(u => `<div class="urow"><span class="udot"></span><span class="uname">${u.n}</span><span class="pp ${u.pp}">${PP_LABEL[u.pp]}</span></div>`).join('')}
+      </div>`).join('');
+  }
+
+  // ---- chat ----
+  const messagesEl = document.getElementById('messages');
+  let messages = [
+    { n:'heejae0105', r:'mod', t:'14:02', b:'3호 안건 참여율이 빠르게 오르고 있어요.' },
+    { n:'stx4R', r:'admin', t:'14:05', b:'좋네요. 1호는 종료 10분 전 공지 한 번 보낼게요.' },
+    { n:'stx4R', r:'admin', t:'14:06', b:'/announcement "제1호 안건 투표가 곧 마감됩니다."', cmd:true },
+    { n:'kmc11004', r:'mod', t:'14:08', b:'접속자 급증 중입니다 (현재 11명).' },
+  ];
+  function renderMessages() {
+    messagesEl.innerHTML = messages.map(m => `
+      <div class="msg">
+        <div class="mh"><span class="mn ${m.r}">${m.n}</span><span class="mt">${m.t}</span>${m.cmd?'<span class="cmd-tag">CMD</span>':''}</div>
+        <span class="mb ${m.cmd?'cmd':''}">${m.b}</span>
+      </div>`).join('');
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  const chatInput = document.getElementById('chatInput');
+  const cmdPop = document.getElementById('cmdPop');
+  function now() { return new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' }); }
+  chatInput.addEventListener('input', () => {
+    const v = chatInput.value;
+    if (v.startsWith('/')) {
+      const matches = COMMANDS.filter(c => c.c.startsWith(v.split(' ')[0]));
+      if (matches.length) {
+        cmdPop.innerHTML = matches.map(c => `<button data-cmd='${c.c} ${c.h} '><b>${c.c}</b><span class="hint">${c.h}</span></button>`).join('');
+        cmdPop.classList.add('show');
+        cmdPop.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { chatInput.value = b.dataset.cmd; cmdPop.classList.remove('show'); chatInput.focus(); }));
+        return;
+      }
+    }
+    cmdPop.classList.remove('show');
+  });
+  document.getElementById('chatForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const v = chatInput.value.trim();
+    if (!v) return;
+    messages.push({ n:'stx4R', r:'admin', t:now(), b:v, cmd:v.startsWith('/') });
+    chatInput.value = ''; cmdPop.classList.remove('show'); renderMessages();
+  });
+
+  // ---- modals ----
+  function show(id){ document.getElementById(id).classList.add('show'); }
+  function hide(id){ document.getElementById(id).classList.remove('show'); }
+  document.getElementById('newBtn').addEventListener('click', () => show('createModal'));
+  document.getElementById('createX').addEventListener('click', () => hide('createModal'));
+  document.getElementById('createCancel').addEventListener('click', () => hide('createModal'));
+  document.getElementById('createSubmit').addEventListener('click', () => {
+    const t = document.getElementById('newTitle').value.trim();
+    const d = document.getElementById('newDesc').value.trim();
+    if (!t || !d) return;
+    agendas.push({ id:'a'+Date.now(), title:t.includes('·')?t:`${t} · 새 안건`, state:'wait', yes:0, no:0, abstain:0 });
+    document.getElementById('newTitle').value=''; document.getElementById('newDesc').value='';
+    hide('createModal'); renderCards();
+  });
+
+  let cfCb = null;
+  function confirmAction(title, body, cb) {
+    document.getElementById('cfTitle').textContent = title;
+    document.getElementById('cfBody').textContent = body;
+    cfCb = cb; show('confirmModal');
+  }
+  document.getElementById('cfCancel').addEventListener('click', () => hide('confirmModal'));
+  document.getElementById('cfOk').addEventListener('click', () => { if (cfCb) cfCb(); hide('confirmModal'); });
+
+  function openResult(a) {
+    const t = tot(a);
+    document.getElementById('rmTitle').textContent = a.title.split(' · ')[1] || a.title;
+    document.getElementById('rmBody').innerHTML = `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;"><b>전체 참여율</b><span style="color:var(--text-secondary)">${t}명 / ${TOTAL_USERS}명 (${pct(t,TOTAL_USERS)}%)</span></div>
+        <div class="bar-track" style="height:8px;"><span class="bar-fill" style="background:#888;width:${pct(t,TOTAL_USERS)}%"></span></div>
+      </div>
+      ${['yes','no','abstain'].map(k=>{const lbl={yes:'찬성',no:'반대',abstain:'기권'}[k];const cls={yes:'yes',no:'no',abstain:'ab'}[k];return `<div class="bar-row" style="grid-template-columns:40px 1fr 78px;margin-bottom:12px;"><span class="bl ${cls}">${lbl}</span><span class="bar-track" style="height:9px;"><span class="bar-fill ${cls}" style="width:${pct(a[k],t)}%"></span></span><span class="bc">${a[k]}명 (${pct(a[k],t)}%)</span></div>`;}).join('')}`;
+    show('resultModal');
+  }
+  document.getElementById('rmX').addEventListener('click', () => hide('resultModal'));
+  [...document.querySelectorAll('.modal-bg')].forEach(m => m.addEventListener('click', (e) => { if (e.target === m) m.classList.remove('show'); }));
+
+  // ---- right tabs ----
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.querySelector(`.tabpane[data-pane="${t.dataset.tab}"]`).classList.add('active');
+  }));
+
+  // ---- nav rail (switch right tab from rail) ----
+  document.querySelectorAll('.rail .navitem').forEach((n, i) => n.addEventListener('click', () => {
+    document.querySelectorAll('.rail .navitem').forEach(x => x.classList.remove('active'));
+    n.classList.add('active');
+    const txt = n.textContent;
+    if (txt.includes('채팅')) document.querySelector('.tab[data-tab="chat"]').click();
+    if (txt.includes('접속자')) document.querySelector('.tab[data-tab="users"]').click();
+  }));
+
+  // ---- mobile tab bar ----
+  const dash = document.getElementById('dash');
+  document.querySelectorAll('.mtabbar button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.mtabbar button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); dash.dataset.m = b.dataset.m;
+  }));
+
+  renderCards(); renderUsers(); renderMessages(); lucide.createIcons();
+</script>
+</body>
+</html>

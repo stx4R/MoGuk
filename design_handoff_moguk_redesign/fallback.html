@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>404 · 서비스 종료</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="stylesheet" href="moguk.css" />
+<style>
+  html, body { height: 100%; }
+  .fb {
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 48px 24px; position: relative; overflow: hidden;
+  }
+  .fb .glow { position: absolute; width: 520px; height: 520px; border-radius: 50%; background: rgba(243,114,127,0.08); filter: blur(120px); top: 30%; left: 50%; transform: translate(-50%,-50%); pointer-events: none; }
+
+  /* ===== IMAGE PLACEHOLDER =====
+     Replace .fb-art with a .gif / .mov: a calm broken-record / muted-disc loop.
+     See note to user. For now: an animated CSS vinyl with a paused needle. */
+  .fb-art {
+    position: relative; width: 200px; height: 200px; margin-bottom: 40px; z-index: 2;
+  }
+  .disc {
+    position: absolute; inset: 0; border-radius: 50%;
+    background:
+      radial-gradient(circle at center, #1f1f1f 0 22%, #2a2a2a 22% 24%, #1a1a1a 24% 100%);
+    box-shadow: var(--shadow-heavy), inset 0 0 0 1px rgba(255,255,255,0.04);
+    animation: spin 8s linear infinite; animation-play-state: paused;
+  }
+  .disc::before { content:""; position: absolute; inset: 30%; border-radius: 50%; background: rgba(243,114,127,0.85); box-shadow: inset 0 0 0 2px rgba(0,0,0,0.3); }
+  .disc::after { content:""; position: absolute; inset: 0; border-radius: 50%; background: repeating-radial-gradient(circle at center, transparent 0 4px, rgba(255,255,255,0.025) 4px 5px); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .needle {
+    position: absolute; top: -6px; right: -2px; width: 92px; height: 10px; transform-origin: right center;
+    transform: rotate(-26deg); z-index: 3;
+  }
+  .needle .arm { position: absolute; inset: 0; height: 6px; top: 2px; border-radius: 3px; background: linear-gradient(90deg,#777,#bbb); }
+  .needle .head { position: absolute; left: -4px; top: -2px; width: 16px; height: 14px; border-radius: 3px; background: #888; }
+  .fb-badge { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; background: rgba(243,114,127,0.14); color: var(--no); font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+
+  .fb h1 { font-family: var(--font-title); font-size: clamp(64px, 14vw, 120px); font-weight: 800; line-height: 1; margin: 0; letter-spacing: -0.04em; z-index: 2; }
+  .fb h1 .o { color: var(--no); }
+  .fb .nf { z-index: 2; font-size: clamp(18px, 3vw, 24px); font-weight: 800; margin: 8px 0 20px; }
+  .fb .sub { z-index: 2; color: var(--text-secondary); font-size: 15px; line-height: 1.7; max-width: 30rem; margin: 0 0 36px; word-break: keep-all; }
+  .fb .actions { z-index: 2; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+  @media (max-width: 560px) {
+    .fb-art { width: 160px; height: 160px; margin-bottom: 32px; }
+    .needle { width: 72px; }
+    .fb .actions { flex-direction: column; width: 100%; max-width: 300px; }
+    .fb .actions .btn { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="fb">
+  <span class="glow"></span>
+
+  <div class="fb-art">
+    <div class="disc"></div>
+    <div class="needle"><span class="arm"></span><span class="head"></span></div>
+    <span class="fb-badge"><i data-lucide="circle-slash" style="width:12px;height:12px;"></i> 재생 중지됨</span>
+  </div>
+
+  <h1>4<span class="o">0</span>4</h1>
+  <p class="nf">not Found</p>
+  <p class="sub">해당 페이지는 제 3회 오량모의국회 웹 운영진들의<br />회의 결과에 따라 서비스가 종료되었음을 알려드립니다.</p>
+
+  <div class="actions">
+    <button class="btn btn-green btn-lg" onclick="history.back()"><i data-lucide="arrow-left" style="width:17px;height:17px;"></i> 이전 페이지로</button>
+    <a class="btn btn-outlined btn-lg" href="main.html"><i data-lucide="home" style="width:17px;height:17px;"></i> 홈으로</a>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lucide@latest"></script>
+<script>lucide.createIcons();</script>
+</body>
+</html>
