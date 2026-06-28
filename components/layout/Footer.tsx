@@ -96,7 +96,7 @@ export default function Footer() {
               오량모의국회
             </Link>
             <p className="text-[13px] text-text-secondary leading-relaxed max-w-[28ch]">
-              제 3회 오량모의국회 공식 웹사이트로, 전자투표 플랫폼으로 활용됩니다.
+              제 3회 오량모의국회 공식 웹사이트로써 전자투표 플랫폼으로 활용됩니다.
             </p>
           </div>
 
