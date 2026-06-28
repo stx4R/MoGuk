@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { OnlineUsersProvider } from '@/components/providers/OnlineUsersContext';
@@ -9,27 +8,31 @@ import PIPChat from '@/components/chat/PIPChat';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AnnouncementBanner from '@/components/layout/AnnouncementBanner';
-// /voteresult 결과 팝업 — 비로그인 포함 전원 수신 S
 import VoteResultModal from '@/components/vote/VoteResultModal';
 
-const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
-const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
-
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://moguk.vercel.app'),
   title: '제 3회 오량모의국회',
   description: '제 3회 오량모의국회 공식 웹사이트입니다.',
+  openGraph: {
+    title: '제 3회 오량모의국회',
+    description: '제 3회 오량모의국회 공식 웹사이트입니다.',
+    images: [{ url: '/clubs/a-logo.png' }],
+  },
   icons: {
-    apple: '/apple-touch-icon.png',
+    apple: [{ url: '/apple-touch-icon.png', sizes: '512x512', type: 'image/png' }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: '오량모의국회',
+    statusBarStyle: 'default',
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="ko" className="dark h-full antialiased">
       <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="오량모의국회" />
         {/* 우클릭/개발자도구 차단 — React 하이드레이션 전 동기 실행 S */}
         <script dangerouslySetInnerHTML={{ __html: `(function(){
 const preventAction=function(e){e.preventDefault();e.stopPropagation();e.returnValue=false;};
@@ -50,12 +53,11 @@ setInterval(function(){
 },100);
 })();` }} />
       </head>
-      <body className="min-h-full flex flex-col bg-white dark:bg-dark-bg text-gray-900 dark:text-gray-100 transition-colors duration-300">
+      <body className="min-h-full flex flex-col bg-bg-base text-text-base">
         <ThemeProvider>
           <OnlineUsersProvider>
             <PIPChatProvider>
               <UserSessionManager />
-              {/* 공지 배너 — 페이지 콘텐츠를 자연스럽게 아래로 밀어냄 S */}
               <AnnouncementBanner />
               <Header />
               <main className="flex-1">{children}</main>

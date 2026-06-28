@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# large font files (self-hosted — deploy separately)
+/public/fonts/*.ttf
+/public/fonts/*.woff
+/public/fonts/*.woff2
+/public/fonts/*.otf

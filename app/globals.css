@@ -1,50 +1,275 @@
 @import "tailwindcss";
 
-/* 클래스 기반 다크모드 활성화 S */
+/* Always dark — .dark class is always applied to <html> */
 @variant dark (&:is(.dark *));
 
-/* 커스텀 컬러 토큰 S */
+/* ============================================================
+   TAILWIND THEME TOKENS
+   These create both CSS custom properties AND Tailwind utility
+   classes (bg-green, text-text-secondary, etc.)
+   ============================================================ */
 @theme {
-  --color-red-primary: #c0392b;
-  --color-red-hover: #a93226;
-  --color-yellow-primary: #f1c40f;
-  --color-yellow-hover: #d4ac0d;
-  --color-dark-bg: #121212;
-  --color-dark-surface: #1e1e1e;
-  --color-dark-border: #2a2a2a;
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Brand palette */
+  --color-green: #1ed760;
+  --color-green-border: #1db954;
+  --color-green-press: #1aa34a;
+
+  /* Surfaces */
+  --color-bg-base: #121212;
+  --color-surface: #181818;
+  --color-surface-2: #1f1f1f;
+  --color-surface-card: #252525;
+  --color-surface-hover: #2a2a2a;
+
+  /* Text */
+  --color-text-base: #ffffff;
+  --color-text-secondary: #b3b3b3;
+  --color-text-near-white: #cbcbcb;
+
+  /* Semantic */
+  --color-negative: #f3727f;
+  --color-warning: #ffa42b;
+  --color-announcement: #539df5;
+
+  /* Borders */
+  --color-border: #4d4d4d;
+  --color-border-light: #7c7c7c;
+  --color-border-inset: #7c7c7c;
+
+  /* Vote / Party */
+  --color-yes: #1ed760;
+  --color-no: #f3727f;
+  --color-abstain: #8a8a8a;
+  --color-jinbo: #539df5;
+  --color-bosu: #f3727f;
+  --color-jungdo: #b3b3b3;
+
+  /* Typography */
+  --font-sans: "Spoqa Han Sans Neo", "Helvetica Neue", helvetica, arial,
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic", sans-serif;
 }
 
-/* 원형 테마 전환 애니메이션 S */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
-  mix-blend-mode: normal;
+/* ============================================================
+   FONT FACES — files go in public/fonts/
+   ============================================================ */
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url("/fonts/SpoqaHanSansNeo-Thin.ttf") format("truetype");
 }
 
-::view-transition-new(root) {
-  animation: circular-reveal 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/SpoqaHanSansNeo-Light.ttf") format("truetype");
 }
 
-::view-transition-old(root) {
-  z-index: 1;
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/SpoqaHanSansNeo-Regular.ttf") format("truetype");
 }
 
-::view-transition-new(root) {
-  z-index: 2;
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/SpoqaHanSansNeo-Medium.ttf") format("truetype");
 }
 
-@keyframes circular-reveal {
-  from {
-    clip-path: circle(0 at var(--reveal-x, 50%) var(--reveal-y, 50%));
-  }
-  to {
-    clip-path: circle(150vmax at var(--reveal-x, 50%) var(--reveal-y, 50%));
-  }
+@font-face {
+  font-family: "Spoqa Han Sans Neo";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/SpoqaHanSansNeo-Bold.ttf") format("truetype");
 }
 
-/* 무한 마키 애니메이션 — translate3d로 GPU 레이어 강제 S */
+/* ============================================================
+   RAW CSS DESIGN TOKENS (for var(--*) usage in components)
+   ============================================================ */
+:root {
+  /* Colors */
+  --green: #1ed760;
+  --green-border: #1db954;
+  --green-press: #1aa34a;
+  --bg-base: #121212;
+  --surface: #181818;
+  --surface-2: #1f1f1f;
+  --surface-card: #252525;
+  --surface-hover: #2a2a2a;
+  --text-base: #ffffff;
+  --text-secondary: #b3b3b3;
+  --text-near-white: #cbcbcb;
+  --negative: #f3727f;
+  --warning: #ffa42b;
+  --announcement: #539df5;
+  --border: #4d4d4d;
+  --border-light: #7c7c7c;
+  --border-inset: #7c7c7c;
+
+  /* Vote / Party semantics */
+  --yes: var(--green);
+  --no: #f3727f;
+  --abstain: #8a8a8a;
+  --jinbo: #539df5;
+  --bosu: #f3727f;
+  --jungdo: #b3b3b3;
+
+  /* Hairlines */
+  --hairline: rgba(255, 255, 255, 0.07);
+  --hairline-strong: rgba(255, 255, 255, 0.12);
+
+  /* App max-width */
+  --maxw: 1180px;
+
+  /* Typography families */
+  --font-title: "Spoqa Han Sans Neo", "Helvetica Neue", helvetica, arial,
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic", sans-serif;
+  --font-ui: "Spoqa Han Sans Neo", "Helvetica Neue", helvetica, arial,
+    "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic", sans-serif;
+  --font-body: var(--font-ui);
+
+  /* Font weights */
+  --weight-thin: 100;
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Font sizes */
+  --fs-section-title: 24px;
+  --fs-feature: 18px;
+  --fs-body: 16px;
+  --fs-button: 14px;
+  --fs-caption: 14px;
+  --fs-small: 12px;
+  --fs-badge: 10.5px;
+  --fs-micro: 10px;
+
+  /* Line heights */
+  --lh-tight: 1.0;
+  --lh-feature: 1.3;
+  --lh-caption: 1.5;
+  --lh-badge: 1.33;
+
+  /* Letter spacing */
+  --ls-button: 1.4px;
+  --ls-button-wide: 2px;
+  --ls-button-tight: 0.14px;
+
+  /* Radius */
+  --radius-badge: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-panel: 10px;
+  --radius-panel-lg: 20px;
+  --radius-100: 100px;
+  --radius-pill: 500px;
+  --radius-full: 9999px;
+  --radius-circle: 50%;
+
+  /* Shadows */
+  --shadow-medium: rgba(0, 0, 0, 0.3) 0px 8px 8px;
+  --shadow-heavy: rgba(0, 0, 0, 0.5) 0px 8px 24px;
+  --shadow-inset: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.3, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 100ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+  --transition-bg: background-color var(--dur-base) var(--ease-standard);
+  --transition-transform: transform var(--dur-fast) var(--ease-standard);
+  --transition-color: color var(--dur-base) var(--ease-standard);
+
+  /* Spacing */
+  --space-px: 1px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-3-5: 14px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --gap-tight: 8px;
+  --gap-row: 12px;
+  --gap-section: 24px;
+  --pad-card: 16px;
+  --pad-button-y: 8px;
+  --pad-button-x: 16px;
+}
+
+/* ============================================================
+   GLOBAL BASE STYLES
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-base);
+  color: var(--text-base);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: rgba(30, 215, 96, 0.28);
+  color: #fff;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #585858;
+  background-clip: padding-box;
+}
+
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
 @keyframes marquee {
   0%   { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
@@ -55,80 +280,58 @@
   100% { transform: translate3d(0, 0, 0); }
 }
 
-/* 공지 텍스트 마키 S */
 @keyframes announcement-scroll {
   0%   { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
 }
 
-/* 파티클 부유 애니메이션 S */
 @keyframes float-up {
-  0% {
-    transform: translateY(0) rotate(0deg);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  90% {
-    opacity: 0.6;
-  }
-  100% {
-    transform: translateY(-100vh) rotate(360deg);
-    opacity: 0;
-  }
+  0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
 }
 
-/* 글로벌 베이스 스타일 S */
-html {
-  scroll-behavior: smooth;
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
 }
 
-body {
-  background-color: #ffffff;
-  color: #171717;
-  font-family: var(--font-geist-sans), Arial, sans-serif;
-  transition: background-color 0.3s ease, color 0.3s ease;
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
 
-.dark body {
-  background-color: #121212;
-  color: #ededed;
+@keyframes count-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* 스크롤바 커스터마이징 S */
-::-webkit-scrollbar {
-  width: 6px;
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50%       { opacity: 0.8; transform: scale(1.05); }
 }
 
-::-webkit-scrollbar-thumb {
-  background-color: #c0392b;
-  border-radius: 3px;
+/* ============================================================
+   CLUB LOGOS — grayscale + invert for dark bg
+   ============================================================ */
+.club-logo {
+  filter: grayscale(100%) invert(1) opacity(0.75);
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background-color: #f1c40f;
+/* ============================================================
+   VIEW TRANSITION (kept for any future use)
+   ============================================================ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
-/* 옐로우 글로우 효과 (다크모드) S */
-.glow-yellow {
-  box-shadow: 0 0 12px 2px rgba(241, 196, 15, 0.5);
-}
-
-.glow-red {
-  box-shadow: 0 0 12px 2px rgba(192, 57, 43, 0.4);
-}
-
-/* 선택 영역 컬러 S */
-::selection {
-  background-color: rgba(192, 57, 43, 0.25);
-  color: inherit;
-}
-
-.dark ::selection {
-  background-color: rgba(241, 196, 15, 0.25);
-}
+::view-transition-old(root) { z-index: 1; }
+::view-transition-new(root) { z-index: 2; }

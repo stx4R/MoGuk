@@ -2,28 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Menu, X, Sun, Moon, LogOut } from 'lucide-react';
+import { Menu, X, LogOut } from 'lucide-react';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
-import { useTheme } from '@/components/providers/ThemeProvider';
 import { cn } from '@/utils/cn';
-
-const NAV_ITEMS = [
-  { label: 'About', href: '/about' },
-  { label: 'Vote', href: '/vote' },
-  { label: 'Chat', href: '/chat' },
-  { label: 'Help', href: '/help' },
-];
 
 const STAFF_ROLES = new Set(['admin', 'mod']);
 
 type Profile = { name: string; role: string; pp: string };
 
-const ROLE_BADGE: Record<string, string> = {
-  admin: 'bg-red-primary/10 text-red-primary border border-red-primary/30',
-  mod:   'bg-yellow-primary/10 text-yellow-primary border border-yellow-primary/30',
-  user:  'bg-green-400/10 text-green-600 dark:text-green-400 border border-green-400/30',
+const ROLE_BADGE: Record<string, { bg: string; text: string }> = {
+  admin: { bg: 'bg-[rgba(243,114,127,0.15)]', text: 'text-negative' },
+  mod:   { bg: 'bg-[rgba(255,164,43,0.15)]',  text: 'text-warning' },
+  user:  { bg: 'bg-[rgba(30,215,96,0.15)]',   text: 'text-green' },
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -32,26 +25,18 @@ const ROLE_LABEL: Record<string, string> = {
   user:  'User',
 };
 
-const PP_BADGE: Record<string, string> = {
-  '진보':   'bg-blue-500/15 text-blue-400 border border-blue-500/30',
-  '보수':   'bg-red-primary/15 text-red-primary border border-red-primary/30',
-  '중도':   'bg-yellow-primary/15 text-yellow-primary border border-yellow-primary/30',
-  '무소속': 'bg-gray-400/15 text-gray-500 dark:text-gray-400 border border-gray-400/30',
+const PP_BADGE: Record<string, { bg: string; text: string }> = {
+  '진보':   { bg: 'bg-[rgba(83,157,245,0.15)]',  text: 'text-jinbo' },
+  '보수':   { bg: 'bg-[rgba(243,114,127,0.15)]', text: 'text-negative' },
+  '중도':   { bg: 'bg-[rgba(255,255,255,0.08)]', text: 'text-text-secondary' },
+  '무소속': { bg: 'bg-[rgba(255,255,255,0.08)]', text: 'text-text-secondary' },
 };
 
 export default function Header() {
   const router = useRouter();
-  const { theme, toggleTheme } = useTheme();
-  const [scrolled, setScrolled]     = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser]             = useState<SupabaseUser | null>(null);
   const [profile, setProfile]       = useState<Profile | null>(null);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -83,75 +68,157 @@ export default function Header() {
     const supabase = createClient();
     await supabase.auth.signOut();
     setProfile(null);
+    setMobileOpen(false);
     router.push('/');
     router.refresh();
   };
 
-  const badgeClass  = profile ? (ROLE_BADGE[profile.role]  ?? ROLE_BADGE.user)  : '';
-  const badgeLabel  = profile ? (ROLE_LABEL[profile.role]  ?? profile.role)      : '';
+  const roleBadge = profile ? (ROLE_BADGE[profile.role] ?? ROLE_BADGE.user) : null;
+  const ppBadge   = profile ? (PP_BADGE[profile.pp]   ?? PP_BADGE['무소속']) : null;
   const displayName = profile?.name ?? user?.email?.split('@')[0] ?? '';
+  const isStaff = user && profile && STAFF_ROLES.has(profile.role);
+
+  const navLinks = [
+    { label: '홈',   href: '/' },
+    { label: '소개', href: '/#about' },
+    { label: '투표', href: '/vote' },
+  ];
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-50 w-full transition-all duration-300',
-        scrolled
-          ? 'bg-white/80 dark:bg-dark-bg/80 backdrop-blur-md shadow-sm'
-          : 'bg-white dark:bg-dark-bg',
-        'border-b border-gray-100 dark:border-dark-border'
-      )}
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="sticky top-0 z-50 w-full bg-[rgba(18,18,18,0.72)] backdrop-blur-[14px] saturate-[160%] border-b border-[var(--hairline)]">
+      <div className="max-w-[var(--maxw)] mx-auto px-6 h-16 flex items-center gap-4">
 
-          {/* 로고 */}
-          <Link
-            href="/"
-            className="flex items-center gap-2 font-bold text-xl text-red-primary hover:opacity-80 transition-opacity shrink-0"
-          >
-            <span className="text-yellow-primary">⚖</span>
-            오량모의국회
-          </Link>
+        {/* Brand */}
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 font-extrabold text-[17px] tracking-[-0.02em] text-text-base shrink-0"
+        >
+          <span className="w-[30px] h-[30px] rounded-full bg-green flex items-center justify-center shrink-0">
+            <Image
+              src="/moguk_logo.svg"
+              alt="오량모의국회"
+              width={22}
+              height={22}
+              className="brightness-0"
+            />
+          </span>
+          오량모의국회
+        </Link>
 
-          {/* 데스크탑 네비게이션 */}
-          <nav className="hidden md:flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
+        {/* Desktop nav */}
+        <nav className="hidden md:flex items-center gap-1 ml-auto">
+          {navLinks.map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              className="px-3.5 py-2 rounded-full text-sm font-semibold text-text-secondary hover:text-text-base transition-colors duration-150"
+            >
+              {item.label}
+            </Link>
+          ))}
+          {isStaff && (
+            <Link
+              href="/admin-dashboard"
+              className="px-3.5 py-2 rounded-full text-sm font-semibold text-text-secondary hover:text-text-base transition-colors duration-150"
+            >
+              대시보드
+            </Link>
+          )}
+        </nav>
+
+        {/* Auth area */}
+        <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--hairline-strong)]">
+          {user ? (
+            <>
+              {profile && (
+                <div className="flex items-center gap-1.5">
+                  {ppBadge && (
+                    <span className={cn(
+                      'px-2.5 py-0.5 rounded-full text-[10.5px] font-bold',
+                      ppBadge.bg, ppBadge.text
+                    )}>
+                      {profile.pp}
+                    </span>
+                  )}
+                  {roleBadge && (
+                    <span className={cn(
+                      'px-2.5 py-0.5 rounded-full text-[10.5px] font-bold',
+                      roleBadge.bg, roleBadge.text
+                    )}>
+                      {ROLE_LABEL[profile.role] ?? profile.role}
+                    </span>
+                  )}
+                  <span className="text-sm text-text-secondary">{displayName}</span>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold text-text-secondary hover:text-text-base hover:bg-surface-hover transition-colors duration-150"
+              >
+                <LogOut size={14} />
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <Link
+              href="/login"
+              className="px-5 py-2 rounded-full text-sm font-bold bg-green text-black hover:brightness-110 transition-all duration-150"
+            >
+              로그인
+            </Link>
+          )}
+        </div>
+
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMobileOpen((v) => !v)}
+          aria-label="메뉴 열기"
+          className="md:hidden ml-auto p-2 text-text-secondary hover:text-text-base transition-colors"
+        >
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-[var(--hairline)] bg-bg-base">
+          <nav className="px-4 py-3 flex flex-col gap-1">
+            {navLinks.map((item) => (
               <Link
                 key={item.label}
                 href={item.href}
-                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-primary dark:hover:text-yellow-primary transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface"
+                onClick={() => setMobileOpen(false)}
+                className="px-4 py-3 text-sm font-semibold text-text-secondary hover:text-text-base rounded-full hover:bg-surface-hover transition-colors"
               >
                 {item.label}
               </Link>
             ))}
-            {user && profile && STAFF_ROLES.has(profile.role) && (
+            {isStaff && (
               <Link
                 href="/admin-dashboard"
-                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-primary dark:hover:text-yellow-primary transition-colors rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface"
+                onClick={() => setMobileOpen(false)}
+                className="px-4 py-3 text-sm font-semibold text-text-secondary hover:text-text-base rounded-full hover:bg-surface-hover transition-colors"
               >
-                Dashboard
+                대시보드
               </Link>
             )}
 
-            {/* 로그인 / 유저 영역 */}
             {user ? (
-              <div className="flex items-center gap-2 ml-1 pl-3 border-l border-gray-200 dark:border-dark-border">
-                <div className="flex items-center gap-1.5">
-                  {profile && (
-                    <>
-                      <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold', PP_BADGE[profile.pp] ?? PP_BADGE['무소속'])}>
-                        {profile.pp}
-                      </span>
-                      <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold', badgeClass)}>
-                        {badgeLabel}
-                      </span>
-                    </>
-                  )}
-                  <span className="text-sm text-gray-700 dark:text-gray-300">{displayName}</span>
-                </div>
+              <div className="flex items-center gap-2 px-4 py-3">
+                {profile && ppBadge && (
+                  <span className={cn('px-2.5 py-0.5 rounded-full text-[10.5px] font-bold shrink-0', ppBadge.bg, ppBadge.text)}>
+                    {profile.pp}
+                  </span>
+                )}
+                {profile && roleBadge && (
+                  <span className={cn('px-2.5 py-0.5 rounded-full text-[10.5px] font-bold shrink-0', roleBadge.bg, roleBadge.text)}>
+                    {ROLE_LABEL[profile.role] ?? profile.role}
+                  </span>
+                )}
+                <span className="text-sm text-text-secondary flex-1 truncate">{displayName}</span>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-red-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 text-sm font-semibold text-negative shrink-0"
                 >
                   <LogOut size={14} />
                   로그아웃
@@ -160,93 +227,8 @@ export default function Header() {
             ) : (
               <Link
                 href="/login"
-                className="ml-1 px-4 py-2 text-sm font-semibold rounded-lg bg-red-primary hover:bg-red-hover dark:bg-yellow-primary dark:hover:bg-yellow-hover text-white dark:text-gray-900 transition-colors"
-              >
-                로그인
-              </Link>
-            )}
-
-            {/* 다크모드 토글 */}
-            <button
-              onClick={toggleTheme}
-              aria-label="테마 전환"
-              className="ml-2 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-yellow-primary dark:hover:text-yellow-primary hover:bg-gray-100 dark:hover:bg-dark-surface transition-all duration-200"
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-          </nav>
-
-          {/* 모바일: 햄버거 + 다크모드 */}
-          <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={toggleTheme}
-              aria-label="테마 전환"
-              className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors"
-            >
-              {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-            <button
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label="메뉴 열기"
-              className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-dark-surface transition-colors"
-            >
-              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 모바일 드롭다운 메뉴 */}
-      {mobileOpen && (
-        <div className="md:hidden border-t border-gray-100 dark:border-dark-border bg-white dark:bg-dark-bg">
-          <nav className="px-4 py-3 flex flex-col gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-primary dark:hover:text-yellow-primary rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
-              >
-                {item.label}
-              </Link>
-            ))}
-            {user && profile && STAFF_ROLES.has(profile.role) && (
-              <Link
-                href="/admin-dashboard"
-                onClick={() => setMobileOpen(false)}
-                className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-red-primary dark:hover:text-yellow-primary rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
-              >
-                Dashboard
-              </Link>
-            )}
-
-            {/* 모바일 로그인 / 로그아웃 */}
-            {user ? (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-lg">
-                {profile && (
-                  <>
-                    <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0', PP_BADGE[profile.pp] ?? PP_BADGE['무소속'])}>
-                      {profile.pp}
-                    </span>
-                    <span className={cn('px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0', badgeClass)}>
-                      {badgeLabel}
-                    </span>
-                  </>
-                )}
-                <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 truncate">{displayName}</span>
-                <button
-                  onClick={() => { handleLogout(); setMobileOpen(false); }}
-                  className="flex items-center gap-1.5 text-sm font-medium text-red-primary dark:text-yellow-primary shrink-0"
-                >
-                  <LogOut size={15} />
-                  로그아웃
-                </button>
-              </div>
-            ) : (
-              <Link
-                href="/login"
-                onClick={() => setMobileOpen(false)}
-                className="px-4 py-3 text-sm font-semibold text-red-primary dark:text-yellow-primary rounded-lg hover:bg-gray-50 dark:hover:bg-dark-surface transition-colors"
+                className="mx-4 my-2 py-3 text-center text-sm font-bold rounded-full bg-green text-black"
               >
                 로그인
               </Link>

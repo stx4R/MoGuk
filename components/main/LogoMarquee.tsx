@@ -2,18 +2,18 @@
 import Image from 'next/image';
 
 const CLUBS = [
-  { src: '/clubs/dcn.png',               alt: 'DCN',               invertOnLight: true  },
-  { src: '/clubs/doyl.png',              alt: 'DOYL',              invertOnLight: false },
-  { src: '/clubs/flow-communicators.png',alt: 'Flow Communicators',invertOnLight: false },
-  { src: '/clubs/nalssam.png',           alt: 'NALSSAM',           invertOnLight: false },
-  { src: '/clubs/one-press.png',         alt: 'ONE-PRESS',         invertOnLight: true  },
-  { src: '/clubs/path-finder.png',       alt: 'Path Finder',       invertOnLight: false },
-  { src: '/clubs/inspire.png',           alt: 'Inspire',           invertOnLight: false },
-  { src: '/clubs/gyojiphap.png',         alt: '교집합',             invertOnLight: false },
-  { src: '/clubs/eunoia.png',            alt: 'EUNOIA',            invertOnLight: false },
-  { src: '/clubs/right-us.png',          alt: 'Right-us',          invertOnLight: false },
-  { src: '/clubs/unify.png',             alt: 'UNIFY',             invertOnLight: false },
-  { src: '/clubs/link.png',              alt: 'L-INK',             invertOnLight: false },
+  { src: '/clubs/dcn.png',               alt: 'DCN' },
+  { src: '/clubs/doyl.png',              alt: 'DOYL' },
+  { src: '/clubs/flow-communicators.png',alt: 'Flow Communicators' },
+  { src: '/clubs/nalssam.png',           alt: 'NALSSAM' },
+  { src: '/clubs/one-press.png',         alt: 'ONE-PRESS' },
+  { src: '/clubs/path-finder.png',       alt: 'Path Finder' },
+  { src: '/clubs/inspire.png',           alt: 'Inspire' },
+  { src: '/clubs/gyojiphap.png',         alt: '교집합' },
+  { src: '/clubs/eunoia.png',            alt: 'EUNOIA' },
+  { src: '/clubs/right-us.png',          alt: 'Right-us' },
+  { src: '/clubs/unify.png',             alt: 'UNIFY' },
+  { src: '/clubs/link.png',              alt: 'L-INK' },
 ];
 
 const ALL_CLUBS = [...CLUBS, ...CLUBS];
@@ -43,7 +43,7 @@ export default function LogoMarquee() {
                 width={96}
                 height={64}
                 unoptimized
-                className={`object-contain w-full h-full${club.invertOnLight ? ' invert dark:invert-0' : ''}`}
+                className="object-contain w-full h-full club-logo"
                 draggable={false}
               />
             </div>
