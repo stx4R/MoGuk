@@ -236,9 +236,12 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* base 레이어에 둬야 underline 등 유틸리티가 이 리셋을 덮어쓸 수 있음 (Tailwind v4 cascade layer) S */
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 img {

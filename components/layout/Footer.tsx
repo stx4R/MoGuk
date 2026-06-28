@@ -170,7 +170,7 @@ export default function Footer() {
             © 2026 제 3회 오량모의국회. All rights reserved.
           </p>
           <p className="text-[12px] text-[#6f6f6f]">
-            Developed by © 김윤철 팬클럽{' '}
+            Developed by © 김윤철 팬클럽 - {' '}
             {CREDITS.map((c, i) => (
               <span key={c.label}>
                 <a
