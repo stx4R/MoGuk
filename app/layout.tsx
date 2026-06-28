@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { OnlineUsersProvider } from '@/components/providers/OnlineUsersContext';
@@ -25,8 +25,21 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: '오량모의국회',
-    statusBarStyle: 'default',
+    statusBarStyle: 'black',
   },
+  // Next 16의 appleWebApp.capable은 mobile-web-app-capable만 출력하므로,
+  // 구형 iOS Safari가 홈 화면 standalone 실행을 인식하도록 레거시 메타를 명시 S
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#121212',
+  colorScheme: 'dark',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover', // 노치/홈 인디케이터 영역까지 채워 standalone 몰입감 확보 S
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

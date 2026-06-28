@@ -2,7 +2,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_ROUTES = ['/', '/about', '/login', '/signup', '/help'];
+const PUBLIC_ROUTES = ['/', '/about', '/login', '/signup', '/help', '/terms', '/privacy', '/operation'];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -67,6 +67,8 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon\\.ico).*)',
+    // 확장자가 있는 정적 파일(폰트·로고·아이콘·manifest 등)은 프록시를 거치지 않도록 제외 —
+    // 비로그인 방문자에게 정적 자원이 /login으로 리다이렉트되던 문제 방지 S
+    '/((?!_next/static|_next/image|favicon\\.ico|.*\\..*).*)',
   ],
 };
