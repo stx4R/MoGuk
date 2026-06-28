@@ -34,13 +34,13 @@ export default function AboutPage() {
 
       <div className="content-ab space-y-4">
         <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(255,255,255,0.07)] border border-[var(--hairline)] text-xs font-bold text-[var(--green)] tracking-widest uppercase">
-          서비스 종료
+          Error 410
         </span>
         <h1 className="text-[32px] font-black text-text-base leading-tight tracking-tight">
           소개 페이지가<br />종료되었습니다
         </h1>
         <p className="text-sm text-text-secondary max-w-[36ch] mx-auto leading-relaxed">
-          제 3회 오량모의국회 행사가 종료되어<br />소개 페이지 서비스가 중단되었습니다.
+          제 3회 오량모의국회 운영진들과의 회의를 통해<br />소개 페이지 서비스를 종료했습니다.
         </p>
         <div className="flex items-center justify-center gap-3 pt-2">
           <Link href="/" className="px-5 py-2.5 rounded-full bg-[var(--green)] text-black text-sm font-bold hover:brightness-110 transition-all">

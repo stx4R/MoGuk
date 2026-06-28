@@ -2,22 +2,22 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 const SITE_LINKS = [
-  { label: '홈',      href: '/' },
-  { label: '소개',    href: '/#about' },
-  { label: '투표',    href: '/vote' },
+  { label: '주요 기능',      href: 'https://classroom.google.com/c/ODU0ODA1OTY5ODY1/m/ODY2NDQ2ODQ3NTI4/details' },
+  { label: '시작하기',    href: '/#about' },
+  { label: '계정 가입',    href: '/signup' },
 ];
 
 const ABOUT_LINKS = [
-  { label: '타임라인',   href: '/#timeline' },
-  { label: '부서 소개',  href: '/#departments' },
-  { label: '정당 소개',  href: '/#parties' },
-  { label: '운영 절차',  href: '/#process' },
+  { label: '문의 연락처',   href: '/#timeline' },
+  { label: '문의 이메일',  href: '/#departments' },
+  { label: '자주 묻는 질문',  href: 'https://stx4r.github.io/MoGuk---Ask/' },
+  { label: '오류 신고',  href: '/help' },
 ];
 
 const DEV_LINKS = [
-  { label: 'stx4R',   href: 'http://stx4r.me/' },
-  { label: 'kmc',     href: 'https://github.com/kmc11004' },
-  { label: 'heejae',  href: 'https://github.com/heejae0105' },
+  { label: '이용약관',   href: 'http://stx4r.me/' },
+  { label: '개인정보처리방침',     href: 'https://github.com/kmc11004' },
+  { label: '운영 정책',  href: 'https://github.com/heejae0105' },
 ];
 
 export default function Footer() {
@@ -46,13 +46,13 @@ export default function Footer() {
               오량모의국회
             </Link>
             <p className="text-[13px] text-text-secondary leading-relaxed max-w-[28ch]">
-              제 3회 오량모의국회 공식 웹사이트입니다. 민주주의 체험과 토론 문화 발전을 목적으로 운영됩니다.
+              제 3회 오량모의국회 공식 웹사이트로써, 전자투표 플랫폼으로 활용됩니다.
             </p>
           </div>
 
           {/* Col 2: 사이트 */}
           <div>
-            <h4 className="text-[13px] font-bold text-text-base mb-4">사이트</h4>
+            <h4 className="text-[13px] font-bold text-text-base mb-4">서비스</h4>
             <ul className="flex flex-col gap-2.5">
               {SITE_LINKS.map((l) => (
                 <li key={l.label}>
@@ -69,7 +69,7 @@ export default function Footer() {
 
           {/* Col 3: 소개 */}
           <div>
-            <h4 className="text-[13px] font-bold text-text-base mb-4">소개</h4>
+            <h4 className="text-[13px] font-bold text-text-base mb-4">지원</h4>
             <ul className="flex flex-col gap-2.5">
               {ABOUT_LINKS.map((l) => (
                 <li key={l.label}>
@@ -86,7 +86,7 @@ export default function Footer() {
 
           {/* Col 4: 개발팀 */}
           <div>
-            <h4 className="text-[13px] font-bold text-text-base mb-4">개발팀</h4>
+            <h4 className="text-[13px] font-bold text-text-base mb-4">정책</h4>
             <ul className="flex flex-col gap-2.5">
               {DEV_LINKS.map((l) => (
                 <li key={l.label}>
@@ -110,7 +110,7 @@ export default function Footer() {
             © 2026 제 3회 오량모의국회. All rights reserved.
           </p>
           <p className="text-[12px] text-[#6f6f6f]">
-            Developed by{' '}
+            Developed by © 김윤철 팬클럽{' '}
             {DEV_LINKS.map((l, i) => (
               <span key={l.label}>
                 <a
