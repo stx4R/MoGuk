@@ -75,8 +75,11 @@ export default function Header() {
   const ppBadge   = profile ? (PP_BADGE[profile.pp]   ?? PP_BADGE['무소속']) : null;
   const displayName = profile?.name ?? user?.email?.split('@')[0] ?? '';
 
+  // 대시보드 탭은 로그인 + Mod/Admin 권한일 때만 노출 (실제 접근 제어는 proxy가 담당) S
+  const isStaff = profile?.role === 'admin' || profile?.role === 'mod';
   const navLinks = [
     { label: '투표', href: '/vote' },
+    ...(isStaff ? [{ label: '대시보드', href: '/admin-dashboard' }] : []),
   ];
 
   return (

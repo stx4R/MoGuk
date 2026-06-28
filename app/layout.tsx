@@ -8,7 +8,6 @@ import PIPChat from '@/components/chat/PIPChat';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import AnnouncementBanner from '@/components/layout/AnnouncementBanner';
-import VoteResultModal from '@/components/vote/VoteResultModal';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://moguk.vercel.app'),
@@ -76,7 +75,6 @@ setInterval(function(){
               <main className="flex-1">{children}</main>
               <Footer />
               <PIPChat />
-              <VoteResultModal />
             </PIPChatProvider>
           </OnlineUsersProvider>
         </ThemeProvider>

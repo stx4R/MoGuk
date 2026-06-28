@@ -55,10 +55,11 @@ function LoginContent() {
 
     setMascot('happy');
     setSuccess(true);
+    // 새로 발급된 세션 쿠키를 서버(proxy)가 즉시 인식하도록 하드 내비게이션 사용 —
+    // soft router 전환 시 쿠키 전파 레이스로 '환영' 오버레이에 멈추던 문제 방지 S
     setTimeout(() => {
-      router.push(safeRedirect(searchParams.get('redirectTo')));
-      router.refresh();
-    }, 1200);
+      window.location.assign(safeRedirect(searchParams.get('redirectTo')));
+    }, 1100);
   };
 
   const togglePw = () => {
