@@ -5,8 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion, useInView } from 'framer-motion';
 import {
-  Scale, Gavel, ScrollText, ChevronDown,
-  Mail, Phone, Instagram, Send, MessageCircle,
+  Landmark, Hammer, FileText, ChevronDown,
+  Mail, Phone, Camera, Send, MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
@@ -177,7 +177,7 @@ export default function HomePage() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-[0.12em] bg-[rgba(30,215,96,0.15)] text-green border border-[rgba(30,215,96,0.25)]"
           >
-            <Scale size={13} />
+            <Landmark size={13} />
             2026 정책기반 사회문제 해결 프로젝트
           </motion.span>
 
@@ -217,14 +217,14 @@ export default function HomePage() {
               href="/vote"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full text-sm font-bold bg-green text-black hover:brightness-110 active:scale-95 transition-all duration-150"
             >
-              <Gavel size={17} />
+              <Hammer size={17} />
               안건 투표하기
             </Link>
             <Link
               href="#about"
               className="inline-flex items-center gap-2 px-8 py-4 rounded-full text-sm font-bold text-text-base border border-border-light hover:border-text-base active:scale-95 transition-all duration-150"
             >
-              <ScrollText size={17} />
+              <FileText size={17} />
               프로그램 안내
             </Link>
           </motion.div>
@@ -508,7 +508,7 @@ export default function HomePage() {
                 className="inline-flex items-center gap-2.5 px-4 py-3 rounded-[14px] text-[13px] font-bold text-white hover:scale-[1.04] hover:brightness-110 transition-all duration-180"
                 style={{ background: 'linear-gradient(135deg, #f77737, #e1306c, #833ab4)' }}
               >
-                <Instagram size={15} />
+                <Camera size={15} />
                 Instagram
               </a>
               <a
