@@ -23,8 +23,8 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: '오량모의국회',
-    statusBarStyle: 'black',
+    title: '제 3회 오량모의국회',
+    statusBarStyle: 'black-translucent',
   },
   // Next 16의 appleWebApp.capable은 mobile-web-app-capable만 출력하므로,
   // 구형 iOS Safari가 홈 화면 standalone 실행을 인식하도록 레거시 메타를 명시 S
@@ -38,6 +38,8 @@ export const viewport: Viewport = {
   colorScheme: 'dark',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
   viewportFit: 'cover', // 노치/홈 인디케이터 영역까지 채워 standalone 몰입감 확보 S
 };
 

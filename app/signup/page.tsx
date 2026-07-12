@@ -3,54 +3,14 @@
 // 회원가입 페이지 — 사전 승인된 이름만 가입 허용 S
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/utils/cn';
+import { AlertCircle } from 'lucide-react';
 
-function FloatingInput({
-  id,
-  label,
-  type = 'text',
-  value,
-  onChange,
-  autoComplete,
-}: {
-  id: string;
-  label: string;
-  type?: string;
-  value: string;
-  onChange: (v: string) => void;
-  autoComplete?: string;
-}) {
-  const [focused, setFocused] = useState(false);
-  const lifted = focused || value.length > 0;
-
-  return (
-    <div className="relative mt-6">
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        autoComplete={autoComplete ?? id}
-        className="peer w-full px-4 pt-5 pb-2.5 rounded-xl border-2 bg-white dark:bg-dark-surface text-gray-900 dark:text-white text-sm outline-none transition-all duration-200 border-gray-200 dark:border-dark-border focus:border-red-primary dark:focus:border-yellow-primary"
-      />
-      <label
-        htmlFor={id}
-        className={cn(
-          'absolute left-4 text-gray-400 dark:text-gray-500 pointer-events-none transition-all duration-200 origin-left',
-          lifted
-            ? 'top-2 text-xs scale-90 text-red-primary dark:text-yellow-primary'
-            : 'top-1/2 -translate-y-1/2 text-sm'
-        )}
-      >
-        {label}
-      </label>
-    </div>
-  );
-}
+const inputCls =
+  'w-full text-[14px] text-text-base bg-surface-2 border border-border rounded-md px-3 py-2 ' +
+  'outline-none placeholder:text-[#6b6b6b] transition-[border-color,box-shadow] duration-150 ' +
+  'focus:border-green focus:shadow-[0_0_0_3px_rgba(30,215,96,0.25)]';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -63,9 +23,13 @@ export default function SignupPage() {
   const [error, setError]       = useState('');
   const [success, setSuccess]   = useState(false);
 
-  const handleSubmit = async (e: { preventDefault(): void }) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !otp || !email || !password) return;
+    if (!name || !otp || !email || !password || loading) return;
+    if (password.length < 8) {
+      setError('비밀번호는 8자 이상이어야 합니다.');
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -88,148 +52,142 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] flex">
-      {/* 좌측 그래픽 패널 */}
-      <div className="hidden md:flex w-1/2 bg-red-primary dark:bg-dark-surface items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          {[...Array(6)].map((_, i) => (
+    <>
+      <style>{`
+        @keyframes check-pop {
+          0%{transform:scale(0)} 60%{transform:scale(1.12)} 100%{transform:scale(1)}
+        }
+      `}</style>
+
+      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center px-4 pt-8 pb-6">
+
+        {/* Logo */}
+        <div className="w-12 h-12 rounded-full bg-green flex items-center justify-center mt-4">
+          <Image src="/moguk_logo.svg" alt="오량모의국회" width={30} height={30} className="brightness-0" />
+        </div>
+
+        <h1 className="text-[24px] font-light tracking-[-0.5px] text-text-base text-center mt-6 mb-4">
+          의원 계정 등록
+        </h1>
+
+        {success ? (
+          /* 성공 상태 */
+          <div className="w-full max-w-[308px] bg-surface border border-[var(--hairline-strong)] rounded-md px-5 py-9 text-center">
             <div
-              key={i}
-              className="absolute rounded-full border-2 border-white"
-              style={{
-                width: `${(i + 1) * 120}px`,
-                height: `${(i + 1) * 120}px`,
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-              }}
-            />
-          ))}
-        </div>
-        <div className="relative z-10 text-center text-white px-12">
-          <UserPlus size={64} className="mx-auto mb-6 opacity-90" />
-          <h2 className="text-3xl font-extrabold mb-3">의원 계정 등록</h2>
-          <p className="text-red-100 dark:text-gray-300 text-sm leading-relaxed">
-            운영진에게 사전 배정받은
-            <br />
-            이름으로만 가입할 수 있습니다.
-          </p>
-        </div>
-      </div>
-
-      {/* 우측 폼 패널 */}
-      <div className="w-full md:w-1/2 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-
-          {success ? (
-            /* 성공 상태 */
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <CheckCircle2 size={56} className="text-green-500" />
-              </div>
-              <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-2">
-                가입 완료!
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                계정이 생성되었습니다.
-                <br />
-                잠시 후 로그인 페이지로 이동합니다.
-              </p>
+              className="w-14 h-14 rounded-full bg-[rgba(30,215,96,0.15)] flex items-center justify-center mx-auto mb-4"
+              style={{ animation: 'check-pop 0.5s cubic-bezier(0.16,1,0.3,1)' }}
+            >
+              <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 13l4 4L19 7" />
+              </svg>
             </div>
-          ) : (
-            <>
-              <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-1">
-                회원가입
-              </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-                운영진에게 배정된 이름을 사용해주세요.
+            <h2 className="text-[20px] font-bold text-text-base mb-2">가입 완료!</h2>
+            <p className="text-[14px] text-text-secondary leading-[1.6]">
+              계정이 생성되었습니다.
+              <br />
+              잠시 후 로그인 페이지로 이동합니다.
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Error message */}
+            {error && (
+              <div className="w-full max-w-[308px] flex items-start gap-2 text-[13px] text-negative bg-[rgba(243,114,127,0.1)] border border-[rgba(243,114,127,0.35)] rounded-md px-3.5 py-3 mb-4">
+                <AlertCircle size={15} className="shrink-0 mt-px" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {/* Signup card */}
+            <form
+              onSubmit={handleSubmit}
+              noValidate
+              className="w-full max-w-[308px] bg-surface border border-[var(--hairline-strong)] rounded-md p-5 flex flex-col"
+            >
+              <label htmlFor="su-name" className="text-[14px] font-medium text-text-base mb-2">
+                이름 (배정된 이름)
+              </label>
+              <input
+                id="su-name"
+                type="text"
+                value={name}
+                onChange={(e) => { setName(e.target.value); setError(''); }}
+                autoComplete="name"
+                className={inputCls + ' mb-1'}
+              />
+              <p className="text-[12px] text-text-secondary mb-4">
+                운영진에게 사전 배정받은 이름으로만 가입할 수 있습니다.
               </p>
 
-              <form onSubmit={handleSubmit} className="space-y-0">
-                {error && (
-                  <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-primary/10 border border-red-primary/20 text-red-primary text-sm">
-                    <AlertCircle size={15} className="shrink-0" />
-                    {error}
-                  </div>
-                )}
+              <label htmlFor="su-otp" className="text-[14px] font-medium text-text-base mb-2">
+                OTP
+              </label>
+              <input
+                id="su-otp"
+                type="text"
+                value={otp}
+                onChange={(e) => { setOtp(e.target.value); setError(''); }}
+                autoComplete="off"
+                className={inputCls + ' mb-4 tracking-[2px]'}
+              />
 
-                <FloatingInput
-                  id="name"
-                  label="이름 (배정된 이름)"
-                  value={name}
-                  onChange={setName}
-                  autoComplete="name"
-                />
+              <label htmlFor="su-email" className="text-[14px] font-medium text-text-base mb-2">
+                이메일
+              </label>
+              <input
+                id="su-email"
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                autoComplete="email"
+                className={inputCls + ' mb-4'}
+              />
 
-                <FloatingInput
-                  id="otp"
-                  label="OTP"
-                  value={otp}
-                  onChange={setOtp}
-                  autoComplete="off"
-                />
-
-                <FloatingInput
-                  id="email"
-                  label="이메일"
-                  type="email"
-                  value={email}
-                  onChange={setEmail}
-                />
-
-                <div className="relative">
-                  <FloatingInput
-                    id="password"
-                    label="비밀번호 (8자 이상)"
-                    type={showPw ? 'text' : 'password'}
-                    value={password}
-                    onChange={setPassword}
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    tabIndex={-1}
-                    onClick={() => setShowPw((v) => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 mt-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-                  >
-                    {showPw ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-
+              <div className="flex items-baseline justify-between mb-2">
+                <label htmlFor="su-pw" className="text-[14px] font-medium text-text-base">
+                  비밀번호
+                </label>
                 <button
-                  type="submit"
-                  disabled={loading || !name || !otp || !email || !password}
-                  className={cn(
-                    'w-full mt-8 flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold text-sm transition-all duration-200',
-                    'bg-red-primary hover:bg-red-hover dark:bg-yellow-primary dark:hover:bg-yellow-hover text-white dark:text-gray-900',
-                    'disabled:opacity-50 disabled:cursor-not-allowed',
-                    'hover:scale-[1.02] active:scale-[0.98]'
-                  )}
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPw((v) => !v)}
+                  className="text-[12px] text-green cursor-pointer"
                 >
-                  {loading ? (
-                    <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent dark:border-gray-900 dark:border-t-transparent" />
-                  ) : (
-                    <>
-                      <UserPlus size={16} />
-                      가입하기
-                    </>
-                  )}
+                  {showPw ? '숨기기' : '표시'}
                 </button>
-              </form>
+              </div>
+              <input
+                id="su-pw"
+                type={showPw ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                autoComplete="new-password"
+                className={inputCls + ' mb-1'}
+              />
+              <p className="text-[12px] text-text-secondary mb-4">8자 이상 입력해주세요.</p>
 
-              <p className="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                이미 계정이 있으신가요?{' '}
-                <Link
-                  href="/login"
-                  className="font-semibold text-red-primary dark:text-yellow-primary hover:underline"
-                >
-                  로그인
-                </Link>
-              </p>
-            </>
-          )}
-        </div>
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading || !name || !otp || !email || !password}
+                className="w-full flex items-center justify-center gap-2 px-3 py-[9px] rounded-md border border-green-border bg-green text-black text-[14px] font-bold cursor-pointer transition-[filter] duration-150 hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
+                ) : (
+                  '가입하기'
+                )}
+              </button>
+            </form>
+
+            {/* Login box */}
+            <div className="w-full max-w-[308px] border border-[var(--hairline-strong)] rounded-md px-5 py-4 mt-4 text-center text-[14px] text-text-secondary">
+              이미 계정이 있으신가요?{' '}
+              <Link href="/login" className="text-green hover:underline">로그인</Link>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </>
   );
 }
