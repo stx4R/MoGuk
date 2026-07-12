@@ -1,6 +1,5 @@
 'use client';
 
-// 회원가입 페이지 — 사전 승인된 이름만 가입 허용 S
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -59,10 +58,8 @@ export default function SignupPage() {
         }
       `}</style>
 
-      {/* min-h 강제 없음 — 콘텐츠 높이만 차지해 푸터가 바로 아래 붙도록 S */}
-      <div className="flex flex-col items-center px-4 pt-8 pb-6">
+      <div className="flex flex-col items-center px-4 pt-8 pb-12">
 
-        {/* Logo */}
         <div className="w-12 h-12 rounded-full bg-green flex items-center justify-center mt-4">
           <Image src="/moguk_logo.svg" alt="오량모의국회" width={30} height={30} className="brightness-0" />
         </div>
@@ -72,7 +69,6 @@ export default function SignupPage() {
         </h1>
 
         {success ? (
-          /* 성공 상태 */
           <div className="w-full max-w-[308px] bg-surface border border-[var(--hairline-strong)] rounded-md px-5 py-9 text-center">
             <div
               className="w-14 h-14 rounded-full bg-[rgba(30,215,96,0.15)] flex items-center justify-center mx-auto mb-4"
@@ -91,7 +87,6 @@ export default function SignupPage() {
           </div>
         ) : (
           <>
-            {/* Error message */}
             {error && (
               <div className="w-full max-w-[560px] flex items-start gap-2 text-[13px] text-negative bg-[rgba(243,114,127,0.1)] border border-[rgba(243,114,127,0.35)] rounded-md px-3.5 py-3 mb-4">
                 <AlertCircle size={15} className="shrink-0 mt-px" />
@@ -99,14 +94,12 @@ export default function SignupPage() {
               </div>
             )}
 
-            {/* Signup card — 2×2 필드 배치 (좌: 이름/OTP, 우: 이메일/비밀번호), 모바일에선 세로 스택 S */}
             <form
               onSubmit={handleSubmit}
               noValidate
               className="w-full max-w-[560px] bg-surface border border-[var(--hairline-strong)] rounded-md p-5"
             >
-              <div className="grid sm:grid-cols-2 gap-x-4 gap-y-4">
-                {/* 이름 — 좌상 */}
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-5">
                 <div className="sm:col-start-1 sm:row-start-1">
                   <label htmlFor="su-name" className="block text-[14px] font-medium text-text-base mb-2">
                     이름 (배정된 이름)
@@ -121,7 +114,6 @@ export default function SignupPage() {
                   />
                 </div>
 
-                {/* OTP — 좌하 */}
                 <div className="sm:col-start-1 sm:row-start-2">
                   <label htmlFor="su-otp" className="block text-[14px] font-medium text-text-base mb-2">
                     OTP
@@ -136,7 +128,6 @@ export default function SignupPage() {
                   />
                 </div>
 
-                {/* 이메일 — 우상 */}
                 <div className="sm:col-start-2 sm:row-start-1">
                   <label htmlFor="su-email" className="block text-[14px] font-medium text-text-base mb-2">
                     이메일
@@ -151,7 +142,6 @@ export default function SignupPage() {
                   />
                 </div>
 
-                {/* 비밀번호 — 우하 */}
                 <div className="sm:col-start-2 sm:row-start-2">
                   <div className="flex items-baseline justify-between mb-2">
                     <label htmlFor="su-pw" className="text-[14px] font-medium text-text-base">
@@ -178,7 +168,6 @@ export default function SignupPage() {
                 </div>
               </div>
 
-              {/* Submit */}
               <button
                 type="submit"
                 disabled={loading || !name || !otp || !email || !password}
@@ -192,7 +181,6 @@ export default function SignupPage() {
               </button>
             </form>
 
-            {/* Login box */}
             <div className="w-full max-w-[560px] border border-[var(--hairline-strong)] rounded-md px-5 py-4 mt-4 text-center text-[14px] text-text-secondary">
               이미 계정이 있으신가요?{' '}
               <Link href="/login" className="text-green hover:underline">로그인</Link>

@@ -1,4 +1,3 @@
-// 서버 환경 Supabase 클라이언트 S
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 
@@ -19,7 +18,7 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server Component에서는 쿠키 쓰기 불가 — 무시
+            return;
           }
         },
       },

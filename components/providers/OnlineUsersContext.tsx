@@ -1,5 +1,4 @@
 'use client';
-// 전체 접속자 목록 공유 Context — UserSessionManager에서 채우고 Admin Dashboard에서 읽음 S
 import { createContext, useContext, useState, type ReactNode } from 'react';
 
 export type OnlineUser = { user_id: string; name: string; pp: string; online_at: string };

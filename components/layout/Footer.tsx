@@ -20,7 +20,6 @@ const POLICY_LINKS = [
   { label: '운영정책',         href: '/operation' },
 ];
 
-// 하단 개발팀 크레딧 — 정책명이 아닌 실제 개발자 핸들 S
 const CREDITS = [
   { label: 'stx4R',      href: 'https://github.com/stx4R' },
   { label: 'kmc11005',   href: 'https://github.com/kmc11005' },
@@ -32,12 +31,10 @@ const linkCls =
   'underline underline-offset-[3px] decoration-[#5a5a5a] hover:decoration-current';
 
 async function copyText(text: string): Promise<boolean> {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch { /* fall through to legacy path */ }
+  if (navigator.clipboard && window.isSecureContext) {
+    const ok = await navigator.clipboard.writeText(text).then(() => true).catch(() => false);
+    if (ok) return true;
+  }
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -72,13 +69,11 @@ export default function Footer() {
   };
 
   return (
-    <footer className="border-t border-[var(--hairline)] bg-[#0d0d0d]">
+    <footer className="border-t border-[var(--hairline)] bg-[#0d0d0d] pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-[var(--maxw)] mx-auto px-6 pt-14 pb-10">
 
-        {/* 4-column grid */}
         <div className="grid grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-8">
 
-          {/* Col 1: Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link
               href="/"
@@ -100,7 +95,6 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Col 2: 서비스 */}
           <div>
             <h4 className="text-[13px] font-bold text-text-base mb-4">서비스</h4>
             <ul className="flex flex-col gap-2.5">
@@ -118,7 +112,6 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Col 3: 지원 */}
           <div>
             <h4 className="text-[13px] font-bold text-text-base mb-4">지원</h4>
             <ul className="flex flex-col gap-2.5 items-start">
@@ -145,13 +138,9 @@ export default function Footer() {
                   자주 묻는 질문
                 </a>
               </li>
-              <li>
-                <Link href="/help" className={linkCls}>오류 신고</Link>
-              </li>
             </ul>
           </div>
 
-          {/* Col 4: 정책 */}
           <div>
             <h4 className="text-[13px] font-bold text-text-base mb-4">정책</h4>
             <ul className="flex flex-col gap-2.5">
@@ -164,7 +153,6 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom bar */}
         <div className="border-t border-[var(--hairline)] mt-11 pt-6 flex flex-wrap items-center justify-between gap-3">
           <p className="text-[12px] text-[#6f6f6f]">
             © 2026 제 3회 오량모의국회. All rights reserved.
@@ -188,7 +176,6 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* 복사 완료 토스트 */}
       {toast && (
         <div className="fixed inset-x-0 bottom-8 z-[300] flex justify-center px-4 pointer-events-none">
           <div

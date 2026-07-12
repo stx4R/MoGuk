@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
 
-// PWA 매니페스트 — 홈 화면 추가 시 Safari 주소창/버튼 없는 standalone 실행 S
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: '제 3회 오량모의국회',

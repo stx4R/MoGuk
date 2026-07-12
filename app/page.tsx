@@ -9,7 +9,6 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-// ── Data ──────────────────────────────────────────────────────────
 const STATS = [
   { count: 100, suffix: '명', label: '총 참가자' },
   { count: 9,   suffix: '개', label: '부처' },
@@ -77,7 +76,6 @@ const PROCESS = [
   { num: 4, name: '본회의',     date: '07.25 (월)',     desc: '제안설명 → 토론 → 전자 투표 → 시상' },
 ];
 
-// ── Sub-components ──────────────────────────────────────────────
 const REVEAL_PROPS = {
   initial: { opacity: 0, y: 24 },
   whileInView: { opacity: 1, y: 0 },
@@ -140,15 +138,12 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────
 export default function HomePage() {
   const allClubs = [...CLUBS, ...CLUBS];
 
   return (
     <>
-      {/* ── Hero ─────────────────────────────────────────────── */}
       <section className="relative min-h-[86vh] flex flex-col items-center justify-center text-center overflow-hidden px-6 py-20">
-        {/* Background glows */}
         <div
           className="absolute rounded-full pointer-events-none"
           style={{
@@ -169,7 +164,6 @@ export default function HomePage() {
         />
 
         <div className="relative z-10 max-w-[940px]">
-          {/* Badge */}
           <motion.span
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -180,7 +174,6 @@ export default function HomePage() {
             2026 정책기반 사회문제 해결 프로젝트
           </motion.span>
 
-          {/* Title */}
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -194,7 +187,6 @@ export default function HomePage() {
             <span className="whitespace-nowrap text-green">모의국회</span>
           </motion.h1>
 
-          {/* Sub */}
           <motion.p
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -205,7 +197,6 @@ export default function HomePage() {
             보이지 않는 곳에서<br />보이는 것을 위하여
           </motion.p>
 
-          {/* CTAs */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -229,7 +220,6 @@ export default function HomePage() {
           </motion.div>
         </div>
 
-        {/* Scroll cue */}
         <a
           href="#about"
           className="absolute bottom-7 left-1/2 -translate-x-1/2 text-[#5a5a5a] z-10"
@@ -247,7 +237,6 @@ export default function HomePage() {
         `}</style>
       </section>
 
-      {/* ── Stat Band ────────────────────────────────────────── */}
       <div className="border-t border-[var(--hairline)] border-b border-[var(--hairline)] bg-surface">
         <div className="max-w-[var(--maxw)] mx-auto px-6 py-11 grid grid-cols-2 sm:grid-cols-4 gap-6">
           {STATS.map((s) => (
@@ -264,7 +253,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── Club Marquee ─────────────────────────────────────── */}
       <div className="py-11 bg-bg-base border-b border-[var(--hairline)] overflow-hidden">
         <p className="text-center text-[11px] font-bold tracking-[0.3em] uppercase text-[#6f6f6f] mb-7">
           참여 동아리
@@ -294,7 +282,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* ── About: Overview ──────────────────────────────────── */}
       <section id="about" className="px-6 py-24 max-w-[920px] mx-auto">
         <Reveal>
           <div className="mb-12">
@@ -308,14 +295,12 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      {/* ── Timeline ─────────────────────────────────────────── */}
       <section id="timeline" className="px-6 pb-24 max-w-[920px] mx-auto">
         <Reveal className="mb-12">
           <SectionEyebrow>전체 일정</SectionEyebrow>
           <SectionTitle>활동 타임라인</SectionTitle>
         </Reveal>
 
-        {/* Desktop: center-spine alternating */}
         <div className="relative hidden sm:block">
           <div
             className="absolute left-1/2 top-0 bottom-0 w-px -translate-x-px"
@@ -349,7 +334,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Mobile: single column */}
         <div className="sm:hidden relative">
           <div
             className="absolute left-[18px] top-0 bottom-0 w-px"
@@ -365,7 +349,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Departments ──────────────────────────────────────── */}
       <section id="departments" className="px-6 pb-24 max-w-[var(--maxw)] mx-auto">
         <Reveal className="mb-12">
           <SectionEyebrow>참가자 구성</SectionEyebrow>
@@ -393,7 +376,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Parties ──────────────────────────────────────────── */}
       <section id="parties" className="px-6 pb-24 max-w-[920px] mx-auto">
         <Reveal className="mb-12">
           <SectionEyebrow>정당 구성</SectionEyebrow>
@@ -429,7 +411,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Process ──────────────────────────────────────────── */}
       <section id="process" className="px-6 pb-24 max-w-[920px] mx-auto">
         <Reveal className="mb-12">
           <SectionEyebrow>활동 과정</SectionEyebrow>
@@ -438,7 +419,6 @@ export default function HomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           {PROCESS.map((p, i) => (
             <Reveal key={p.num} delay={i * 0.07}>
-              {/* Mobile: horizontal layout */}
               <div className="flex sm:flex-col sm:items-center sm:text-center gap-3.5">
                 <div
                   className="w-11 h-11 shrink-0 rounded-full bg-green text-black font-extrabold text-[16px] flex items-center justify-center"
@@ -460,7 +440,6 @@ export default function HomePage() {
   );
 }
 
-// ── Timeline card sub-component ───────────────────────────────────
 function TlCard({ date, name, desc }: { date: string; name: string; desc: string }) {
   return (
     <div

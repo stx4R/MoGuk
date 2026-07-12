@@ -7,7 +7,6 @@ import Image from 'next/image';
 import { AlertCircle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-// Open Redirect 방지 화이트리스트 S
 const VALID_REDIRECT = new Set(['/vote', '/admin-dashboard']);
 function safeRedirect(raw: string | null): string {
   return raw && VALID_REDIRECT.has(raw) ? raw : '/';
@@ -54,8 +53,6 @@ function LoginContent() {
     }
 
     setSuccess(true);
-    // 새로 발급된 세션 쿠키를 서버(proxy)가 즉시 인식하도록 하드 내비게이션 사용 —
-    // soft router 전환 시 쿠키 전파 레이스로 '환영' 오버레이에 멈추던 문제 방지 S
     setTimeout(() => {
       window.location.assign(safeRedirect(searchParams.get('redirectTo')));
     }, 1100);
@@ -76,10 +73,8 @@ function LoginContent() {
         }
       `}</style>
 
-      {/* min-h 강제 없음 — 콘텐츠 높이만 차지해 푸터가 바로 아래 붙도록 S */}
-      <div className="flex flex-col items-center px-4 pt-8 pb-6">
+      <div className="flex flex-col items-center px-4 pt-8 pb-12">
 
-        {/* Logo */}
         <div className="w-12 h-12 rounded-full bg-green flex items-center justify-center mt-4">
           <Image src="/moguk_logo.svg" alt="오량모의국회" width={30} height={30} className="brightness-0" />
         </div>
@@ -88,7 +83,6 @@ function LoginContent() {
           오량모의국회 로그인
         </h1>
 
-        {/* Error message */}
         {error && (
           <div className="w-full max-w-[308px] flex items-start gap-2 text-[13px] text-negative bg-[rgba(243,114,127,0.1)] border border-[rgba(243,114,127,0.35)] rounded-md px-3.5 py-3 mb-4">
             <AlertCircle size={15} className="shrink-0 mt-px" />
@@ -96,7 +90,6 @@ function LoginContent() {
           </div>
         )}
 
-        {/* Login card */}
         <form
           onSubmit={handleSubmit}
           noValidate
@@ -138,7 +131,6 @@ function LoginContent() {
             className={inputCls + ' mb-4'}
           />
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={loading || !email || !password}
@@ -152,14 +144,12 @@ function LoginContent() {
           </button>
         </form>
 
-        {/* Signup box */}
         <div className="w-full max-w-[308px] border border-[var(--hairline-strong)] rounded-md px-5 py-4 mt-4 text-center text-[14px] text-text-secondary">
           계정이 없으신가요?{' '}
           <Link href="/signup" className="text-green hover:underline">회원가입</Link>
         </div>
       </div>
 
-      {/* ── Success overlay ── */}
       {success && (
         <div
           className="fixed inset-0 z-80 flex flex-col items-center justify-center gap-4"

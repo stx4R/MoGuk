@@ -1,11 +1,10 @@
-// 정책 문서 공용 레이아웃 — orya.ng/terms 형식 (단일 컬럼, 제N조 + 구분선 + 번호 조항) S
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
 export type Clause = {
-  label?: string;   // '가', '나', '1' 등 — 없으면 들여쓰기 없는 단락
+  label?: string;
   text: string;
-  sub?: string[];   // 1, 2, 3 … 하위 항목
+  sub?: string[];
 };
 
 export type Article = {

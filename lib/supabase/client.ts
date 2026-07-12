@@ -1,4 +1,3 @@
-// 브라우저 환경 Supabase 클라이언트 S
 import { createBrowserClient } from '@supabase/ssr';
 
 export function createClient() {

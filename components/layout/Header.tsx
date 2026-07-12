@@ -75,7 +75,6 @@ export default function Header() {
   const ppBadge   = profile ? (PP_BADGE[profile.pp]   ?? PP_BADGE['무소속']) : null;
   const displayName = profile?.name ?? user?.email?.split('@')[0] ?? '';
 
-  // 대시보드 탭은 로그인 + Mod/Admin 권한일 때만 노출 (실제 접근 제어는 proxy가 담당) S
   const isStaff = profile?.role === 'admin' || profile?.role === 'mod';
   const navLinks = [
     { label: '투표', href: '/vote' },
@@ -83,11 +82,9 @@ export default function Header() {
   ];
 
   return (
-    // top: safe-area만큼 내려 고정 — iOS standalone에서 상태바와 겹치지 않도록 (일반 브라우저에선 0) S
     <header className="sticky top-[env(safe-area-inset-top)] z-50 w-full bg-[rgba(18,18,18,0.72)] backdrop-blur-[14px] saturate-[160%] border-b border-[var(--hairline)]">
       <div className="max-w-[var(--maxw)] mx-auto px-6 h-16 flex items-center gap-4">
 
-        {/* Brand */}
         <Link
           href="/"
           className="flex items-center gap-2.5 font-extrabold text-[17px] tracking-[-0.02em] text-text-base shrink-0"
@@ -104,7 +101,6 @@ export default function Header() {
           오량모의국회
         </Link>
 
-        {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1 ml-auto">
           {navLinks.map((item) => (
             <Link
@@ -117,7 +113,6 @@ export default function Header() {
           ))}
         </nav>
 
-        {/* Auth area */}
         <div className="hidden md:flex items-center gap-2 pl-3 border-l border-[var(--hairline-strong)]">
           {user ? (
             <>
@@ -160,7 +155,6 @@ export default function Header() {
           )}
         </div>
 
-        {/* Mobile hamburger */}
         <button
           onClick={() => setMobileOpen((v) => !v)}
           aria-label="메뉴 열기"
@@ -170,7 +164,6 @@ export default function Header() {
         </button>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-[var(--hairline)] bg-bg-base">
           <nav className="px-4 py-3 flex flex-col gap-1">

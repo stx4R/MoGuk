@@ -1,42 +1,30 @@
 @import "tailwindcss";
 
-/* Always dark — .dark class is always applied to <html> */
 @variant dark (&:is(.dark *));
 
-/* ============================================================
-   TAILWIND THEME TOKENS
-   These create both CSS custom properties AND Tailwind utility
-   classes (bg-green, text-text-secondary, etc.)
-   ============================================================ */
 @theme {
-  /* Brand palette */
   --color-green: #1ed760;
   --color-green-border: #1db954;
   --color-green-press: #1aa34a;
 
-  /* Surfaces */
   --color-bg-base: #121212;
   --color-surface: #181818;
   --color-surface-2: #1f1f1f;
   --color-surface-card: #252525;
   --color-surface-hover: #2a2a2a;
 
-  /* Text */
   --color-text-base: #ffffff;
   --color-text-secondary: #b3b3b3;
   --color-text-near-white: #cbcbcb;
 
-  /* Semantic */
   --color-negative: #f3727f;
   --color-warning: #ffa42b;
   --color-announcement: #539df5;
 
-  /* Borders */
   --color-border: #4d4d4d;
   --color-border-light: #7c7c7c;
   --color-border-inset: #7c7c7c;
 
-  /* Vote / Party */
   --color-yes: #1ed760;
   --color-no: #f3727f;
   --color-abstain: #8a8a8a;
@@ -44,14 +32,10 @@
   --color-bosu: #f3727f;
   --color-jungdo: #b3b3b3;
 
-  /* Typography */
   --font-sans: "Spoqa Han Sans Neo", "Helvetica Neue", helvetica, arial,
     "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic", sans-serif;
 }
 
-/* ============================================================
-   FONT FACES — files go in public/fonts/
-   ============================================================ */
 @font-face {
   font-family: "Spoqa Han Sans Neo";
   font-style: normal;
@@ -92,11 +76,7 @@
   src: url("/fonts/SpoqaHanSansNeo-Bold.ttf") format("truetype");
 }
 
-/* ============================================================
-   RAW CSS DESIGN TOKENS (for var(--*) usage in components)
-   ============================================================ */
 :root {
-  /* Colors */
   --green: #1ed760;
   --green-border: #1db954;
   --green-press: #1aa34a;
@@ -115,7 +95,6 @@
   --border-light: #7c7c7c;
   --border-inset: #7c7c7c;
 
-  /* Vote / Party semantics */
   --yes: var(--green);
   --no: #f3727f;
   --abstain: #8a8a8a;
@@ -123,21 +102,17 @@
   --bosu: #f3727f;
   --jungdo: #b3b3b3;
 
-  /* Hairlines */
   --hairline: rgba(255, 255, 255, 0.07);
   --hairline-strong: rgba(255, 255, 255, 0.12);
 
-  /* App max-width */
   --maxw: 1180px;
 
-  /* Typography families */
   --font-title: "Spoqa Han Sans Neo", "Helvetica Neue", helvetica, arial,
     "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic", sans-serif;
   --font-ui: "Spoqa Han Sans Neo", "Helvetica Neue", helvetica, arial,
     "Hiragino Sans", "Hiragino Kaku Gothic ProN", Meiryo, "MS Gothic", sans-serif;
   --font-body: var(--font-ui);
 
-  /* Font weights */
   --weight-thin: 100;
   --weight-light: 300;
   --weight-regular: 400;
@@ -145,7 +120,6 @@
   --weight-semibold: 600;
   --weight-bold: 700;
 
-  /* Font sizes */
   --fs-section-title: 24px;
   --fs-feature: 18px;
   --fs-body: 16px;
@@ -155,18 +129,15 @@
   --fs-badge: 10.5px;
   --fs-micro: 10px;
 
-  /* Line heights */
   --lh-tight: 1.0;
   --lh-feature: 1.3;
   --lh-caption: 1.5;
   --lh-badge: 1.33;
 
-  /* Letter spacing */
   --ls-button: 1.4px;
   --ls-button-wide: 2px;
   --ls-button-tight: 0.14px;
 
-  /* Radius */
   --radius-badge: 2px;
   --radius-sm: 4px;
   --radius-md: 6px;
@@ -178,12 +149,10 @@
   --radius-full: 9999px;
   --radius-circle: 50%;
 
-  /* Shadows */
   --shadow-medium: rgba(0, 0, 0, 0.3) 0px 8px 8px;
   --shadow-heavy: rgba(0, 0, 0, 0.5) 0px 8px 24px;
   --shadow-inset: rgb(18, 18, 18) 0px 1px 0px, rgb(124, 124, 124) 0px 0px 0px 1px inset;
 
-  /* Motion */
   --ease-standard: cubic-bezier(0.3, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 100ms;
@@ -193,7 +162,6 @@
   --transition-transform: transform var(--dur-fast) var(--ease-standard);
   --transition-color: color var(--dur-base) var(--ease-standard);
 
-  /* Spacing */
   --space-px: 1px;
   --space-0-5: 2px;
   --space-1: 4px;
@@ -216,9 +184,6 @@
   --pad-button-x: 16px;
 }
 
-/* ============================================================
-   GLOBAL BASE STYLES
-   ============================================================ */
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -236,7 +201,6 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* base 레이어에 둬야 underline 등 유틸리티가 이 리셋을 덮어쓸 수 있음 (Tailwind v4 cascade layer) S */
 @layer base {
   a {
     color: inherit;
@@ -254,9 +218,6 @@ img {
   color: #fff;
 }
 
-/* ============================================================
-   SCROLLBAR
-   ============================================================ */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -270,9 +231,6 @@ img {
   background-clip: padding-box;
 }
 
-/* ============================================================
-   KEYFRAMES
-   ============================================================ */
 @keyframes marquee {
   0%   { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
@@ -320,16 +278,10 @@ img {
   50%       { opacity: 0.8; transform: scale(1.05); }
 }
 
-/* ============================================================
-   CLUB LOGOS — grayscale + invert for dark bg
-   ============================================================ */
 .club-logo {
   filter: grayscale(100%) invert(1) opacity(0.75);
 }
 
-/* ============================================================
-   VIEW TRANSITION (kept for any future use)
-   ============================================================ */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;

@@ -1,4 +1,3 @@
-// 강제 로그아웃 API — Service Role로 세션 전체 무효화 S
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -16,7 +15,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '인증 필요' }, { status: 401 });
   }
 
-  // 요청자가 admin인지 검증
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -33,7 +31,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '대상 유저 ID 필요' }, { status: 400 });
   }
 
-  // L-8 fix: 대상이 admin인지 확인 — admin끼리 강제 로그아웃 차단
   const { data: targetProfile } = await supabase
     .from('profiles')
     .select('role')
@@ -46,7 +43,6 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // 해당 유저의 모든 세션 무효화
   const { error } = await admin.auth.admin.signOut(targetUserId, 'global');
 
   if (error) {

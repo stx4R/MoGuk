@@ -1,4 +1,3 @@
-// 안건 투표 페이지 — 2열 레이아웃 (좌측 목록 + 우측 상세) + 결과 공개 시 인라인 집계 S
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -30,7 +29,6 @@ type PublishedMap = Record<string, VoteResult>;
 
 const VOTE_LABEL: Record<string, string> = { yes: '찬성', no: '반대', abstain: '기권' };
 
-// ── 상태 문구 ───────────────────────────────────────────────────
 function statusSub(item: AgendaItem, published: boolean, voted: boolean): string {
   const base = published
     ? '결과 공개됨'
@@ -42,7 +40,6 @@ function statusSub(item: AgendaItem, published: boolean, voted: boolean): string
   return voted ? `${base} · 참여함` : base;
 }
 
-// ── 좌측 목록 아이템 ────────────────────────────────────────────
 function AgendaListItem({
   item, selected, published, voted, onClick,
 }: {
@@ -75,7 +72,6 @@ function AgendaListItem({
   );
 }
 
-// ── 인라인 결과 집계 ────────────────────────────────────────────
 function ResultBars({ result }: { result: VoteResult }) {
   const totalVoted = result.total_voted || 1;
   const totalUsers = result.total_users || 1;
@@ -117,7 +113,6 @@ function ResultBars({ result }: { result: VoteResult }) {
   );
 }
 
-// ── 우측 상세 ───────────────────────────────────────────────────
 const CHOICES = [
   { choice: 'yes'     as const, label: '찬성', Icon: CheckCircle2, hoverBorder: 'hover:border-green hover:text-green' },
   { choice: 'no'      as const, label: '반대', Icon: XCircle,      hoverBorder: 'hover:border-negative hover:text-negative' },
@@ -146,7 +141,6 @@ function AgendaDetail({
 
   return (
     <div className="flex flex-col h-full p-8 max-md:p-5">
-      {/* 상태 배지 */}
       <div className="mb-5">
         {result ? (
           <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-[rgba(83,157,245,0.15)] text-announcement">
@@ -166,20 +160,17 @@ function AgendaDetail({
         )}
       </div>
 
-      {/* 제목 */}
       <h2 className="text-[24px] max-md:text-[20px] font-extrabold text-text-base mb-3 leading-tight">
         {item.title}
       </h2>
       <div className="w-11 h-1 rounded-full bg-green mb-6" />
 
-      {/* 설명 */}
       {item.description && (
         <p className="text-sm text-text-near-white leading-[1.75] border-l-2 border-[rgba(30,215,96,0.3)] pl-4 mb-8 whitespace-pre-line">
           {item.description}
         </p>
       )}
 
-      {/* 투표 / 결과 영역 */}
       <div className="mt-auto">
         {result ? (
           <ResultBars result={result} />
@@ -238,10 +229,9 @@ function AgendaDetail({
   );
 }
 
-// ── 메인 페이지 ────────────────────────────────────────────────
 export default function VotePage() {
   const router = useRouter();
-  const supabase = useRef(createClient()).current;
+  const [supabase] = useState(() => createClient());
 
   const [agendas, setAgendas]       = useState<AgendaItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -253,7 +243,6 @@ export default function VotePage() {
   const resultChRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const loadAgendas = useCallback(async () => {
-    // 중단·완료된 안건도 포함해 전부 표시 (결과 공개 전까지 결과는 숨김) S
     const { data } = await supabase
       .from('agenda_items')
       .select('id, title, description, is_open, is_completed')
@@ -274,7 +263,7 @@ export default function VotePage() {
       .order('created_at', { ascending: true });
     if (data) {
       const map: PublishedMap = {};
-      (data as VoteResult[]).forEach(r => { map[r.agenda_id] = r; }); // 최신(나중) 값이 덮어씀
+      (data as VoteResult[]).forEach(r => { map[r.agenda_id] = r; });
       setPublished(map);
     }
   }, [supabase]);
@@ -306,7 +295,6 @@ export default function VotePage() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_items' }, loadAgendas)
         .subscribe();
 
-      // 결과 공개(브로드캐스트) 실시간 수신 → 인라인 결과 즉시 표시 S
       resultChRef.current = supabase
         .channel('vote-page-results')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vote_result_broadcasts' }, (payload) => {
@@ -368,7 +356,6 @@ export default function VotePage() {
       ) : (
         <div className="grid grid-cols-[300px_1fr] max-md:grid-cols-1 gap-5 items-start">
 
-          {/* ── 좌측: 안건 목록 (데스크탑) ──────────────────────── */}
           <aside className="max-md:hidden">
             <div className="bg-surface rounded-2xl border border-[var(--hairline)] p-2 space-y-0.5 sticky top-[84px]">
               <p className="text-[11px] font-bold text-[#6f6f6f] uppercase tracking-[0.12em] px-3.5 pt-3 pb-2">
@@ -388,7 +375,6 @@ export default function VotePage() {
           </aside>
 
           <div className="flex flex-col min-w-0">
-            {/* ── 칩 스크롤러 (모바일) ──────────────────────────── */}
             <div className="md:hidden flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
               {agendas.map(item => (
                 <button
@@ -411,7 +397,6 @@ export default function VotePage() {
               ))}
             </div>
 
-            {/* ── 상세 패널 ─────────────────────────────────────── */}
             {selectedAgenda ? (
               <div className="bg-surface rounded-2xl border border-[var(--hairline)] overflow-hidden min-h-[460px] max-md:min-h-0">
                 <AgendaDetail
