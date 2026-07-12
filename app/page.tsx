@@ -144,6 +144,16 @@ export default function HomePage() {
   return (
     <>
       <section className="relative min-h-[86vh] flex flex-col items-center justify-center text-center overflow-hidden px-6 py-20">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+          src="/MoGuk%20Background%20Video.mp4"
+        />
+        <div className="absolute inset-0 bg-black/45 pointer-events-none" />
         <div
           className="absolute rounded-full pointer-events-none"
           style={{

@@ -134,9 +134,7 @@ export default function Footer() {
                 </button>
               </li>
               <li>
-                <a href="https://stx4r.github.io/MoGuk---Ask/" target="_blank" rel="noopener noreferrer" className={linkCls}>
-                  자주 묻는 질문
-                </a>
+                <Link href="/faq" className={linkCls}>자주 묻는 질문</Link>
               </li>
             </ul>
           </div>
@@ -165,7 +163,7 @@ export default function Footer() {
                   href={c.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-text-secondary font-semibold hover:text-green transition-colors"
+                  className="text-text-secondary font-semibold underline underline-offset-2 hover:text-green transition-colors"
                 >
                   {c.label}
                 </a>
