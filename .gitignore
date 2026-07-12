@@ -45,3 +45,10 @@ next-env.d.ts
 /public/fonts/*.woff
 /public/fonts/*.woff2
 /public/fonts/*.otf
+
+# supabase
+/supabase/*.sql
+
+# markdown files
+AGENTS.md
+CLAUDE.md
