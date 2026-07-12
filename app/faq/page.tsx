@@ -61,6 +61,10 @@ const FAQ: QA[] = [
   },
 ];
 
+function breakSentences(text: string): string {
+  return text.replace(/\.\s*/g, '.\n').replace(/\n+/g, '\n').trim();
+}
+
 export default function FaqPage() {
   return (
     <div className="max-w-[760px] mx-auto px-6 py-14 md:py-20">
@@ -76,8 +80,8 @@ export default function FaqPage() {
         자주 묻는 질문
       </h1>
       <p className="mt-3 text-[13px] text-text-secondary">최종 업데이트: 2026년 7월 12일</p>
-      <p className="mt-7 text-[15px] leading-[1.75] text-text-near-white">
-        제 3회 오량모의국회 이용 중 자주 접수되는 질문을 모았습니다. 원하는 답을 찾지 못하셨다면 페이지 하단으로 운영진에게 문의해주세요.
+      <p className="mt-7 text-[15px] leading-[1.75] text-text-near-white whitespace-pre-line">
+        {breakSentences('제 3회 오량모의국회 이용 중 자주 접수되는 질문을 모았습니다. 원하는 답을 찾지 못하셨다면 페이지 하단으로 운영진에게 문의해주세요.')}
       </p>
 
       <div className="mt-10 space-y-8">
@@ -89,7 +93,7 @@ export default function FaqPage() {
               </h2>
             </div>
             <p className="mt-3 text-[14.5px] leading-[1.7] text-text-secondary whitespace-pre-line">
-              {item.a}
+              {breakSentences(item.a)}
             </p>
           </section>
         ))}

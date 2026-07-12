@@ -21,7 +21,7 @@ const POLICY_LINKS = [
 ];
 
 const CREDITS = [
-  { label: 'stx4R',      href: 'https://github.com/stx4R' },
+  { label: 'stx4R',      href: 'https://stx4R.me' },
   { label: 'kmc11005',   href: 'https://github.com/kmc11005' },
   { label: 'heejae0105', href: 'https://github.com/heejae0105' },
 ];
