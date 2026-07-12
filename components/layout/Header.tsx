@@ -83,7 +83,8 @@ export default function Header() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-[rgba(18,18,18,0.72)] backdrop-blur-[14px] saturate-[160%] border-b border-[var(--hairline)]">
+    // top: safe-area만큼 내려 고정 — iOS standalone에서 상태바와 겹치지 않도록 (일반 브라우저에선 0) S
+    <header className="sticky top-[env(safe-area-inset-top)] z-50 w-full bg-[rgba(18,18,18,0.72)] backdrop-blur-[14px] saturate-[160%] border-b border-[var(--hairline)]">
       <div className="max-w-[var(--maxw)] mx-auto px-6 h-16 flex items-center gap-4">
 
         {/* Brand */}

@@ -119,9 +119,6 @@ export default function SignupPage() {
                     autoComplete="name"
                     className={inputCls}
                   />
-                  <p className="text-[12px] text-text-secondary mt-1">
-                    운영진에게 사전 배정받은 이름으로만 가입할 수 있습니다.
-                  </p>
                 </div>
 
                 {/* OTP — 좌하 */}

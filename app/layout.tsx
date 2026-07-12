@@ -68,7 +68,11 @@ setInterval(function(){
 },100);
 })();` }} />
       </head>
-      <body className="min-h-full flex flex-col bg-bg-base text-text-base">
+      {/* iOS standalone: 상태바/홈 인디케이터 safe-area만큼 패딩 — iPadOS는 status-bar-style 메타를 무시하고
+          항상 콘텐츠 위에 상태바를 겹치므로 CSS로 공간을 확보해야 함 (일반 브라우저에선 env()=0) S */}
+      <body className="min-h-full flex flex-col bg-bg-base text-text-base pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+        {/* 상태바 영역 전용 불투명 배경 — 스크롤 시 콘텐츠가 상태바 밑으로 비치지 않도록 S */}
+        <div aria-hidden className="fixed inset-x-0 top-0 z-[9999] h-[env(safe-area-inset-top)] bg-bg-base" />
         <ThemeProvider>
           <OnlineUsersProvider>
             <PIPChatProvider>
