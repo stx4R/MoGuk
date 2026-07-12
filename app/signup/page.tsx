@@ -59,7 +59,8 @@ export default function SignupPage() {
         }
       `}</style>
 
-      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center px-4 pt-8 pb-6">
+      {/* min-h 강제 없음 — 콘텐츠 높이만 차지해 푸터가 바로 아래 붙도록 S */}
+      <div className="flex flex-col items-center px-4 pt-8 pb-6">
 
         {/* Logo */}
         <div className="w-12 h-12 rounded-full bg-green flex items-center justify-center mt-4">
@@ -92,85 +93,99 @@ export default function SignupPage() {
           <>
             {/* Error message */}
             {error && (
-              <div className="w-full max-w-[308px] flex items-start gap-2 text-[13px] text-negative bg-[rgba(243,114,127,0.1)] border border-[rgba(243,114,127,0.35)] rounded-md px-3.5 py-3 mb-4">
+              <div className="w-full max-w-[560px] flex items-start gap-2 text-[13px] text-negative bg-[rgba(243,114,127,0.1)] border border-[rgba(243,114,127,0.35)] rounded-md px-3.5 py-3 mb-4">
                 <AlertCircle size={15} className="shrink-0 mt-px" />
                 <span>{error}</span>
               </div>
             )}
 
-            {/* Signup card */}
+            {/* Signup card — 2×2 필드 배치 (좌: 이름/OTP, 우: 이메일/비밀번호), 모바일에선 세로 스택 S */}
             <form
               onSubmit={handleSubmit}
               noValidate
-              className="w-full max-w-[308px] bg-surface border border-[var(--hairline-strong)] rounded-md p-5 flex flex-col"
+              className="w-full max-w-[560px] bg-surface border border-[var(--hairline-strong)] rounded-md p-5"
             >
-              <label htmlFor="su-name" className="text-[14px] font-medium text-text-base mb-2">
-                이름 (배정된 이름)
-              </label>
-              <input
-                id="su-name"
-                type="text"
-                value={name}
-                onChange={(e) => { setName(e.target.value); setError(''); }}
-                autoComplete="name"
-                className={inputCls + ' mb-1'}
-              />
-              <p className="text-[12px] text-text-secondary mb-4">
-                운영진에게 사전 배정받은 이름으로만 가입할 수 있습니다.
-              </p>
+              <div className="grid sm:grid-cols-2 gap-x-4 gap-y-4">
+                {/* 이름 — 좌상 */}
+                <div className="sm:col-start-1 sm:row-start-1">
+                  <label htmlFor="su-name" className="block text-[14px] font-medium text-text-base mb-2">
+                    이름 (배정된 이름)
+                  </label>
+                  <input
+                    id="su-name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => { setName(e.target.value); setError(''); }}
+                    autoComplete="name"
+                    className={inputCls}
+                  />
+                  <p className="text-[12px] text-text-secondary mt-1">
+                    운영진에게 사전 배정받은 이름으로만 가입할 수 있습니다.
+                  </p>
+                </div>
 
-              <label htmlFor="su-otp" className="text-[14px] font-medium text-text-base mb-2">
-                OTP
-              </label>
-              <input
-                id="su-otp"
-                type="text"
-                value={otp}
-                onChange={(e) => { setOtp(e.target.value); setError(''); }}
-                autoComplete="off"
-                className={inputCls + ' mb-4 tracking-[2px]'}
-              />
+                {/* OTP — 좌하 */}
+                <div className="sm:col-start-1 sm:row-start-2">
+                  <label htmlFor="su-otp" className="block text-[14px] font-medium text-text-base mb-2">
+                    OTP
+                  </label>
+                  <input
+                    id="su-otp"
+                    type="text"
+                    value={otp}
+                    onChange={(e) => { setOtp(e.target.value); setError(''); }}
+                    autoComplete="off"
+                    className={inputCls + ' tracking-[2px]'}
+                  />
+                </div>
 
-              <label htmlFor="su-email" className="text-[14px] font-medium text-text-base mb-2">
-                이메일
-              </label>
-              <input
-                id="su-email"
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(''); }}
-                autoComplete="email"
-                className={inputCls + ' mb-4'}
-              />
+                {/* 이메일 — 우상 */}
+                <div className="sm:col-start-2 sm:row-start-1">
+                  <label htmlFor="su-email" className="block text-[14px] font-medium text-text-base mb-2">
+                    이메일
+                  </label>
+                  <input
+                    id="su-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => { setEmail(e.target.value); setError(''); }}
+                    autoComplete="email"
+                    className={inputCls}
+                  />
+                </div>
 
-              <div className="flex items-baseline justify-between mb-2">
-                <label htmlFor="su-pw" className="text-[14px] font-medium text-text-base">
-                  비밀번호
-                </label>
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => setShowPw((v) => !v)}
-                  className="text-[12px] text-green cursor-pointer"
-                >
-                  {showPw ? '숨기기' : '표시'}
-                </button>
+                {/* 비밀번호 — 우하 */}
+                <div className="sm:col-start-2 sm:row-start-2">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <label htmlFor="su-pw" className="text-[14px] font-medium text-text-base">
+                      비밀번호
+                    </label>
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => setShowPw((v) => !v)}
+                      className="text-[12px] text-green cursor-pointer"
+                    >
+                      {showPw ? '숨기기' : '표시'}
+                    </button>
+                  </div>
+                  <input
+                    id="su-pw"
+                    type={showPw ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                    autoComplete="new-password"
+                    className={inputCls}
+                  />
+                  <p className="text-[12px] text-text-secondary mt-1">8자 이상 입력해주세요.</p>
+                </div>
               </div>
-              <input
-                id="su-pw"
-                type={showPw ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                autoComplete="new-password"
-                className={inputCls + ' mb-1'}
-              />
-              <p className="text-[12px] text-text-secondary mb-4">8자 이상 입력해주세요.</p>
 
               {/* Submit */}
               <button
                 type="submit"
                 disabled={loading || !name || !otp || !email || !password}
-                className="w-full flex items-center justify-center gap-2 px-3 py-[9px] rounded-md border border-green-border bg-green text-black text-[14px] font-bold cursor-pointer transition-[filter] duration-150 hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-4 flex items-center justify-center gap-2 px-3 py-[9px] rounded-md border border-green-border bg-green text-black text-[14px] font-bold cursor-pointer transition-[filter] duration-150 hover:brightness-110 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="w-4 h-4 rounded-full border-2 border-black border-t-transparent animate-spin" />
@@ -181,7 +196,7 @@ export default function SignupPage() {
             </form>
 
             {/* Login box */}
-            <div className="w-full max-w-[308px] border border-[var(--hairline-strong)] rounded-md px-5 py-4 mt-4 text-center text-[14px] text-text-secondary">
+            <div className="w-full max-w-[560px] border border-[var(--hairline-strong)] rounded-md px-5 py-4 mt-4 text-center text-[14px] text-text-secondary">
               이미 계정이 있으신가요?{' '}
               <Link href="/login" className="text-green hover:underline">로그인</Link>
             </div>

@@ -24,7 +24,8 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: '제 3회 오량모의국회',
-    statusBarStyle: 'black-translucent',
+    // black-translucent는 상태바(시계/배터리)가 헤더 위에 겹쳐 사용 불가 — 불투명 black으로 유지 S
+    statusBarStyle: 'black',
   },
   // Next 16의 appleWebApp.capable은 mobile-web-app-capable만 출력하므로,
   // 구형 iOS Safari가 홈 화면 standalone 실행을 인식하도록 레거시 메타를 명시 S

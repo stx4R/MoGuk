@@ -76,7 +76,8 @@ function LoginContent() {
         }
       `}</style>
 
-      <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center px-4 pt-8 pb-6">
+      {/* min-h 강제 없음 — 콘텐츠 높이만 차지해 푸터가 바로 아래 붙도록 S */}
+      <div className="flex flex-col items-center px-4 pt-8 pb-6">
 
         {/* Logo */}
         <div className="w-12 h-12 rounded-full bg-green flex items-center justify-center mt-4">
