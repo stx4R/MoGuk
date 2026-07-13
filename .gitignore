@@ -47,7 +47,7 @@ next-env.d.ts
 /public/fonts/*.otf
 
 # supabase
-/supabase/*.sql
+supabase/
 
 # markdown files
 AGENTS.md
