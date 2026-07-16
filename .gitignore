@@ -40,8 +40,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Public
-public/
+# large font files (self-hosted — deploy separately)
+/public/fonts/*.ttf
+/public/fonts/*.woff
+/public/fonts/*.woff2
+/public/fonts/*.otf
 
 # supabase
 supabase/
