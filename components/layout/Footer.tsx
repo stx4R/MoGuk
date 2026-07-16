@@ -8,8 +8,8 @@ import { Check } from 'lucide-react';
 const PHONE = '010-2100-1648';
 const EMAIL = 'suppuding@gmail.com';
 
-const SITE_LINKS = [
-  { label: '주요 기능', href: 'https://classroom.google.com/c/ODU0ODA1OTY5ODY1/m/ODY2NDQ2ODQ3NTI4/details', external: true },
+const SITE_LINKS: { label: string; href: string; external?: boolean }[] = [
+  { label: '주요 기능', href: '/guideline' },
   { label: '시작하기', href: '/login' },
   { label: '계정 가입', href: '/signup' },
 ];
@@ -22,8 +22,7 @@ const POLICY_LINKS = [
 
 const CREDITS = [
   { label: 'stx4R',      href: 'https://stx4R.me' },
-  { label: 'kmc11005',   href: 'https://github.com/kmc11005' },
-  { label: 'heejae0105', href: 'https://github.com/heejae0105' },
+  { label: 'kmc11004',   href: 'https://github.com/kmc11004' },
 ];
 
 const linkCls =
