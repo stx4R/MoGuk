@@ -23,9 +23,19 @@ export default function GuidelinePage() {
     if (hintTimer.current) clearTimeout(hintTimer.current);
   }, []);
 
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.play().catch(() => {
+      v.muted = true;
+      v.play().catch(() => {});
+    });
+  }, []);
+
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
+    v.muted = false;
     if (v.paused) v.play().catch(() => {});
     else v.pause();
   };
@@ -33,6 +43,7 @@ export default function GuidelinePage() {
   const skip = (direction: 'back' | 'forward') => {
     const v = videoRef.current;
     if (!v) return;
+    v.muted = false;
     const delta = direction === 'back' ? -SKIP_SECONDS : SKIP_SECONDS;
     v.currentTime = Math.min(Math.max(v.currentTime + delta, 0), v.duration || 0);
     setCurrentTime(v.currentTime);
