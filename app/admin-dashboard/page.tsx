@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Users, Plus, CheckCircle2, AlertTriangle, X,
-  Vote, Eye, BarChart2, Megaphone, Pause, Play, LogOut, Send, Terminal,
+  Vote, Eye, BarChart2, Megaphone, Pause, Play, LogOut, Send, Terminal, Presentation,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
 import { useOnlineUsers, type OnlineUser } from '@/components/providers/OnlineUsersContext';
+import DisplayBoard from '@/components/dashboard/DisplayBoard';
 
 type AgendaRow    = { id: string; title: string; description: string | null; is_open: boolean; is_completed: boolean; yes_count: number; no_count: number; abstain_count: number; total_count: number };
 type ConfirmModal = { title: string; body: string; danger?: boolean; onConfirm: () => Promise<void> };
@@ -64,6 +65,7 @@ export default function AdminDashboardPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createForm, setCreateForm]           = useState<CreateAgendaForm>({ title: '', description: '' });
   const [creating, setCreating]               = useState(false);
+  const [boardAgenda, setBoardAgenda]         = useState<AgendaRow | null>(null);
 
   const [mobileView, setMobileView] = useState<'main' | 'side'>('main');
 
@@ -294,6 +296,7 @@ export default function AdminDashboardPage() {
           <span className="font-bold text-[15px] text-text-base flex-1 min-w-[160px]">{a.title}</span>
           <span className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full', stateCls)}>{stateLabel}</span>
           <div className="flex gap-1.5 ml-auto">
+            <IconBtn title="전광판" highlight onClick={() => setBoardAgenda(a)}><Presentation size={15} /></IconBtn>
             <IconBtn title="자세히" onClick={() => openDetailModal(a)}><Eye size={15} /></IconBtn>
             {!published && (
               <>
@@ -467,6 +470,14 @@ export default function AdminDashboardPage() {
 
   return (
     <>
+      {isAdmin && boardAgenda && (
+        <DisplayBoard
+          agenda={agendas.find((x) => x.id === boardAgenda.id) ?? boardAgenda}
+          published={publishedIds.has(boardAgenda.id)}
+          onClose={() => setBoardAgenda(null)}
+        />
+      )}
+
       {detailModal && (() => {
         const a = detailModal.agenda;
         const totalVoted = a.total_count || 1;
