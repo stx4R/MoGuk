@@ -201,27 +201,27 @@ function AgendaDetail({
         className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-5"
         onClick={(e) => { if (e.target === e.currentTarget && !voting) setPending(null); }}
       >
-        <div className="bg-surface-card rounded-2xl shadow-[var(--shadow-heavy)] w-full max-w-sm border border-[var(--hairline)] overflow-hidden">
-          <div className="p-6">
-            <p className="text-[15px] text-text-base leading-relaxed">
+        <div className="bg-surface-card rounded-2xl shadow-[var(--shadow-heavy)] w-full max-w-lg border border-[var(--hairline)] overflow-hidden">
+          <div className="px-8 pt-8 pb-3 text-center">
+            <p className="text-[18px] text-text-base leading-relaxed break-keep">
               <span className="font-bold">{item.title}</span> 안건에 대해{' '}
               <span className="font-extrabold" style={{ color: CHOICE_COLOR[pending] }}>{VOTE_LABEL[pending]}</span>
               {VOTE_PARTICLE[pending]} 투표하시겠습니까?
             </p>
-            <p className="text-xs text-text-secondary mt-2">제출 후에는 변경할 수 없습니다.</p>
+            <p className="text-[13px] text-text-secondary mt-3">제출 후에는 변경할 수 없습니다.</p>
           </div>
-          <div className="flex gap-2 justify-end px-6 pb-6">
+          <div className="flex gap-3 justify-center px-8 pt-2 pb-8">
             <button
               onClick={() => setPending(null)}
               disabled={voting}
-              className="px-5 py-2 text-sm rounded-lg border border-[var(--hairline)] text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+              className="min-w-[120px] px-6 py-3 text-[15px] font-semibold rounded-xl border border-[var(--hairline)] text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
             >
               아니오
             </button>
             <button
               onClick={confirmVote}
               disabled={voting}
-              className="px-5 py-2 text-sm rounded-lg bg-green text-black font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+              className="min-w-[120px] px-6 py-3 text-[15px] font-bold rounded-xl bg-green text-black hover:brightness-110 transition-all disabled:opacity-50"
             >
               {voting ? '처리 중...' : '예'}
             </button>

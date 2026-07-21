@@ -28,6 +28,8 @@ const VOTE_LABEL: Record<VoteKey, string> = { yes: '찬성', no: '반대', absta
 const VOTE_COLOR: Record<VoteKey, string> = { yes: '#2fe86f', no: '#ff5c5c', abstain: '#ffcf3d', none: '#8a8a8a' };
 
 const BOARD_COLS = 8;
+const VIEWER_W = 1280;
+const VIEWER_H = 720;
 
 export default function DisplayBoard({ agenda, published, onClose, viewer = false }: {
   agenda: BoardAgenda;
@@ -39,6 +41,8 @@ export default function DisplayBoard({ agenda, published, onClose, viewer = fals
   const [members, setMembers] = useState<Member[]>([]);
   const [popupId, setPopupId] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
   const fetchSeq = useRef(0);
 
   const loadState = useCallback(async () => {
@@ -62,6 +66,17 @@ export default function DisplayBoard({ agenda, published, onClose, viewer = fals
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [supabase, agenda.id, loadState, viewer]);
+
+  useEffect(() => {
+    if (!viewer) return;
+    const el = scaleRef.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / VIEWER_W);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewer]);
 
   const patchMember = (id: string, patch: Partial<Member>) =>
     setMembers(ms => ms.map(m => (m.user_id === id ? { ...m, ...patch } : m)));
@@ -118,16 +133,8 @@ export default function DisplayBoard({ agenda, published, onClose, viewer = fals
   const rows = Math.max(1, Math.ceil(total / BOARD_COLS));
   const popupMember = popupId ? members.find(m => m.user_id === popupId) ?? null : null;
 
-  return (
-    <div
-      ref={viewer ? undefined : overlayRef}
-      className={cn(
-        'bg-[#040404] flex flex-col overflow-hidden',
-        viewer
-          ? 'relative w-full rounded-2xl border border-[#232323] h-[560px] max-md:h-[440px]'
-          : 'fixed inset-0 z-[200]'
-      )}
-    >
+  const boardContent = (
+    <>
       {/* 헤더 바 */}
       <div className="shrink-0 flex items-center gap-3.5 px-[22px] py-3.5 bg-[#0a0a0a] border-b-2 border-[#232323]">
         <span
@@ -247,6 +254,28 @@ export default function DisplayBoard({ agenda, published, onClose, viewer = fals
           onOverrideVote={overrideVote}
         />
       )}
+    </>
+  );
+
+  if (viewer) {
+    return (
+      <div
+        ref={scaleRef}
+        className="w-full max-w-[760px] mx-auto aspect-video relative overflow-hidden rounded-2xl border border-[#232323] bg-[#040404]"
+      >
+        <div
+          className="absolute top-0 left-0 origin-top-left flex flex-col bg-[#040404]"
+          style={{ width: VIEWER_W, height: VIEWER_H, transform: `scale(${scale})` }}
+        >
+          {boardContent}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={overlayRef} className="fixed inset-0 z-[200] bg-[#040404] flex flex-col overflow-hidden">
+      {boardContent}
     </div>
   );
 }
