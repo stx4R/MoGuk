@@ -29,10 +29,11 @@ const VOTE_COLOR: Record<VoteKey, string> = { yes: '#2fe86f', no: '#ff5c5c', abs
 
 const BOARD_COLS = 8;
 
-export default function DisplayBoard({ agenda, published, onClose }: {
+export default function DisplayBoard({ agenda, published, onClose, viewer = false }: {
   agenda: BoardAgenda;
   published: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  viewer?: boolean;
 }) {
   const [supabase] = useState(() => createClient());
   const [members, setMembers] = useState<Member[]>([]);
@@ -42,12 +43,14 @@ export default function DisplayBoard({ agenda, published, onClose }: {
 
   const loadState = useCallback(async () => {
     const seq = ++fetchSeq.current;
-    const { data } = await supabase.rpc('get_board_state', { p_agenda_id: agenda.id });
+    const rpc = viewer ? 'get_published_board_state' : 'get_board_state';
+    const { data } = await supabase.rpc(rpc, { p_agenda_id: agenda.id });
     if (data && seq === fetchSeq.current) setMembers(data as Member[]);
-  }, [supabase, agenda.id]);
+  }, [supabase, agenda.id, viewer]);
 
   useEffect(() => {
     loadState();
+    if (viewer) return;
     const ch = supabase.channel(`board-${agenda.id}`)
       // votes는 서버 필터 없이 구독 — DELETE(미투표 처리) 이벤트는 PK만 담겨
       // agenda_id 필터에 걸리지 않으므로 클라이언트에서 판별해 갱신
@@ -58,7 +61,7 @@ export default function DisplayBoard({ agenda, published, onClose }: {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_attendance', filter: `agenda_id=eq.${agenda.id}` }, loadState)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [supabase, agenda.id, loadState]);
+  }, [supabase, agenda.id, loadState, viewer]);
 
   const patchMember = (id: string, patch: Partial<Member>) =>
     setMembers(ms => ms.map(m => (m.user_id === id ? { ...m, ...patch } : m)));
@@ -88,7 +91,7 @@ export default function DisplayBoard({ agenda, published, onClose }: {
 
   const handleClose = () => {
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    onClose();
+    onClose?.();
   };
 
   const statusLabel = published ? '결과 공개됨' : agenda.is_open ? '투표 진행 중' : agenda.is_completed ? '투표 완료' : '투표 중단됨';
@@ -116,7 +119,15 @@ export default function DisplayBoard({ agenda, published, onClose }: {
   const popupMember = popupId ? members.find(m => m.user_id === popupId) ?? null : null;
 
   return (
-    <div ref={overlayRef} className="fixed inset-0 z-[200] bg-[#040404] flex flex-col overflow-hidden">
+    <div
+      ref={viewer ? undefined : overlayRef}
+      className={cn(
+        'bg-[#040404] flex flex-col overflow-hidden',
+        viewer
+          ? 'relative w-full rounded-2xl border border-[#232323] h-[560px] max-md:h-[440px]'
+          : 'fixed inset-0 z-[200]'
+      )}
+    >
       {/* 헤더 바 */}
       <div className="shrink-0 flex items-center gap-3.5 px-[22px] py-3.5 bg-[#0a0a0a] border-b-2 border-[#232323]">
         <span
@@ -129,23 +140,25 @@ export default function DisplayBoard({ agenda, published, onClose }: {
         <span className="text-[13px] font-bold px-3 py-[3px] rounded-[2px] border tracking-[0.1em]" style={{ color: statusColor, borderColor: statusColor }}>
           {statusLabel}
         </span>
-        <div className="ml-auto flex gap-2">
-          <button
-            title="전체화면"
-            onClick={toggleFullscreen}
-            className="flex items-center gap-1.5 px-3.5 py-[7px] bg-[#151515] border border-[#333] rounded-[2px] text-[#9a9a9a] text-xs font-bold hover:text-white hover:border-[#666] transition-colors"
-          >
-            <Maximize size={13} />
-            FULL
-          </button>
-          <button
-            title="닫기"
-            onClick={handleClose}
-            className="flex items-center justify-center w-8 bg-[#151515] border border-[#333] rounded-[2px] text-[#9a9a9a] hover:text-[#ff5c5c] hover:border-[#ff5c5c] transition-colors"
-          >
-            <X size={15} />
-          </button>
-        </div>
+        {!viewer && (
+          <div className="ml-auto flex gap-2">
+            <button
+              title="전체화면"
+              onClick={toggleFullscreen}
+              className="flex items-center gap-1.5 px-3.5 py-[7px] bg-[#151515] border border-[#333] rounded-[2px] text-[#9a9a9a] text-xs font-bold hover:text-white hover:border-[#666] transition-colors"
+            >
+              <Maximize size={13} />
+              FULL
+            </button>
+            <button
+              title="닫기"
+              onClick={handleClose}
+              className="flex items-center justify-center w-8 bg-[#151515] border border-[#333] rounded-[2px] text-[#9a9a9a] hover:text-[#ff5c5c] hover:border-[#ff5c5c] transition-colors"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 집계 바 */}
@@ -170,13 +183,12 @@ export default function DisplayBoard({ agenda, published, onClose }: {
         >
           {members.map(m => {
             const key: VoteKey = m.present && m.choice ? m.choice : 'none';
-            return (
-              <button
-                key={m.user_id}
-                title={m.name}
-                onClick={() => setPopupId(m.user_id)}
-                className="flex items-center gap-[7px] px-[9px] min-w-0 bg-[#0d0d0d] border border-[#1f1f1f] rounded-[2px] hover:border-[#4a4a4a] hover:bg-[#141414] transition-colors"
-              >
+            const cellClass = cn(
+              'flex items-center gap-[7px] px-[9px] min-w-0 bg-[#0d0d0d] border border-[#1f1f1f] rounded-[2px]',
+              !viewer && 'hover:border-[#4a4a4a] hover:bg-[#141414] transition-colors'
+            );
+            const inner = (
+              <>
                 <span className="w-[9px] h-[9px] rounded-full shrink-0" style={{ background: LED[key], boxShadow: LED_GLOW[key] }} />
                 <span
                   className="text-sm font-bold tracking-[0.06em] whitespace-nowrap overflow-hidden"
@@ -184,7 +196,12 @@ export default function DisplayBoard({ agenda, published, onClose }: {
                 >
                   {m.name}
                 </span>
-              </button>
+              </>
+            );
+            return viewer ? (
+              <div key={m.user_id} title={m.name} className={cellClass}>{inner}</div>
+            ) : (
+              <button key={m.user_id} title={m.name} onClick={() => setPopupId(m.user_id)} className={cellClass}>{inner}</button>
             );
           })}
         </div>
@@ -222,7 +239,7 @@ export default function DisplayBoard({ agenda, published, onClose }: {
         style={{ background: 'repeating-linear-gradient(0deg,rgba(0,0,0,0.22) 0px,rgba(0,0,0,0.22) 1px,transparent 1px,transparent 3px)' }}
       />
 
-      {popupMember && (
+      {popupMember && !viewer && (
         <MemberPopup
           member={popupMember}
           onClose={() => setPopupId(null)}

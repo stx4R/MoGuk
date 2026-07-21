@@ -1,46 +1,38 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT     = 5;
-const RATE_WINDOW_MS = 60_000;
+const FAIL = () => NextResponse.json({ error: 'Something went wrong.' }, { status: 400 });
 
-function checkRateLimit(ip: string): boolean {
-  const now   = Date.now();
-  for (const [key, e] of rateLimitMap) {
-    if (now > e.resetAt) rateLimitMap.delete(key);
-  }
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
-  }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
+function normalizeName(raw: string): string {
+  return raw
+    .normalize('NFC')
+    .replace(/[\u0000-\u001F\u007F\u200B-\u200D\uFEFF]/g, '')
+    .trim();
 }
 
-const FAIL = () => NextResponse.json({ error: 'Something went wrong.' }, { status: 400 });
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: Request) {
   const ip =
     request.headers.get('x-real-ip') ??
     request.headers.get('cf-connecting-ip') ??
-    request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() ??
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     'unknown';
-  if (!checkRateLimit(ip)) return FAIL();
 
   const body = await request.json() as { email?: string; password?: string; name?: string; otp?: string };
   const email    = body.email?.trim();
   const password = body.password;
-  const name     = body.name?.trim();
+  const name     = body.name ? normalizeName(body.name) : undefined;
   const otp      = body.otp?.trim();
 
   if (!email || !password || !name || !otp) return FAIL();
   if (password.length < 8) return FAIL();
-
+  if (!EMAIL_RE.test(email)) return FAIL();
   const admin = createAdminClient();
+  const { data: gate } = await admin.rpc('signup_gate', { p_ip: ip, p_name: name });
 
+  if (!gate?.allowed) return FAIL();
+  const attemptId = gate.attempt_id as string;
   const { data: allowed } = await admin
     .from('allowed_names')
     .select('name')
@@ -49,7 +41,6 @@ export async function POST(request: Request) {
     .single();
 
   if (!allowed) return FAIL();
-
   const { data: takenName } = await admin
     .from('profiles')
     .select('id')
@@ -57,15 +48,16 @@ export async function POST(request: Request) {
     .single();
 
   if (takenName) return FAIL();
-
-  const { error: createError } = await admin.auth.admin.createUser({
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
-    user_metadata: { name: allowed.name },
+    user_metadata: { name: allowed.name, otp },
   });
 
-  if (createError) return FAIL();
+  if (createError || !created?.user) return FAIL();
+  await admin.auth.admin.updateUserById(created.user.id, { user_metadata: { name: allowed.name, otp: null } });
+  await admin.rpc('signup_mark_success', { p_attempt_id: attemptId });
 
   return NextResponse.json({ success: true });
 }

@@ -66,26 +66,26 @@ export default function AdminDashboardPage() {
   const [createForm, setCreateForm]           = useState<CreateAgendaForm>({ title: '', description: '' });
   const [creating, setCreating]               = useState(false);
   const [boardAgenda, setBoardAgenda]         = useState<AgendaRow | null>(null);
-
   const [mobileView, setMobileView] = useState<'main' | 'side'>('main');
-
   const isAdmin = myProfile?.role === 'admin';
-
-  const [onlineRoles, setOnlineRoles] = useState<Map<string, string>>(new Map());
+  const [onlineProfiles, setOnlineProfiles] = useState<Map<string, { role: string; name: string; pp: string }>>(new Map());
 
   useEffect(() => {
     if (!onlineUsers.length) return;
     let active = true;
-    supabase.from('profiles').select('id, role').in('id', onlineUsers.map((u: OnlineUser) => u.user_id))
-      .then(({ data }: { data: { id: string; role: string }[] | null }) => {
-        if (active && data) setOnlineRoles(new Map(data.map((p: { id: string; role: string }) => [p.id, p.role])));
+    supabase.from('profiles').select('id, role, name, pp').in('id', onlineUsers.map((u: OnlineUser) => u.user_id))
+      .then(({ data }: { data: { id: string; role: string; name: string; pp: string }[] | null }) => {
+        if (active && data) setOnlineProfiles(new Map(data.map((p) => [p.id, { role: p.role, name: p.name, pp: p.pp }])));
       });
     return () => { active = false; };
   }, [onlineUsers, supabase]);
 
-  const adminUsers   = onlineUsers.filter((u: OnlineUser) => onlineRoles.get(u.user_id) === 'admin');
-  const modUsers     = onlineUsers.filter((u: OnlineUser) => onlineRoles.get(u.user_id) === 'mod');
-  const regularUsers = onlineUsers.filter((u: OnlineUser) => onlineRoles.get(u.user_id) === 'user' || !onlineRoles.has(u.user_id));
+  const adminUsers   = onlineUsers.filter((u: OnlineUser) => onlineProfiles.get(u.user_id)?.role === 'admin');
+  const modUsers     = onlineUsers.filter((u: OnlineUser) => onlineProfiles.get(u.user_id)?.role === 'mod');
+  const regularUsers = onlineUsers.filter((u: OnlineUser) => {
+    const r = onlineProfiles.get(u.user_id)?.role;
+    return r === 'user' || r === undefined;
+  });
   const onlineCount  = onlineUsers.length;
 
   const refreshAgendas = useCallback(async () => {
@@ -391,13 +391,18 @@ export default function AdminDashboardPage() {
           .map(([key, label, list, txt, dot]) => (
             <div key={key} className="mt-3">
               <p className={cn('text-[11px] font-extrabold uppercase tracking-[0.08em] px-1.5 py-1', txt)}>{label} · {list.length}</p>
-              {list.map((u) => (
-                <div key={u.user_id} className="flex items-center gap-2.5 px-1.5 py-2 rounded-lg hover:bg-surface-2 transition-colors">
-                  <span className={cn('w-2 h-2 rounded-full shrink-0', dot)} />
-                  <span className="flex-1 text-[13px] text-text-near-white truncate">{u.name}</span>
-                  <span className={cn('text-[10px] font-extrabold px-1.5 py-0.5 rounded-full', PP_BADGE[u.pp] ?? PP_BADGE['무소속'])}>{u.pp}</span>
-                </div>
-              ))}
+              {list.map((u) => {
+                const p = onlineProfiles.get(u.user_id);
+                const nm = p?.name ?? '—';
+                const pp = p?.pp ?? '무소속';
+                return (
+                  <div key={u.user_id} className="flex items-center gap-2.5 px-1.5 py-2 rounded-lg hover:bg-surface-2 transition-colors">
+                    <span className={cn('w-2 h-2 rounded-full shrink-0', dot)} />
+                    <span className="flex-1 text-[13px] text-text-near-white truncate">{nm}</span>
+                    <span className={cn('text-[10px] font-extrabold px-1.5 py-0.5 rounded-full', PP_BADGE[pp] ?? PP_BADGE['무소속'])}>{pp}</span>
+                  </div>
+                );
+              })}
             </div>
           ))
       )}

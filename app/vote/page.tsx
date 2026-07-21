@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { CheckCircle2, XCircle, MinusCircle, Clock, Lock, BarChart3 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
+import DisplayBoard from '@/components/dashboard/DisplayBoard';
 
 type AgendaItem = {
   id: string;
@@ -28,6 +29,7 @@ type VoteResult = {
 type PublishedMap = Record<string, VoteResult>;
 
 const VOTE_LABEL: Record<string, string> = { yes: '찬성', no: '반대', abstain: '기권' };
+const VOTE_PARTICLE: Record<string, string> = { yes: '으로', no: '로', abstain: '으로' };
 
 function statusSub(item: AgendaItem, published: boolean, voted: boolean): string {
   const base = published
@@ -72,47 +74,6 @@ function AgendaListItem({
   );
 }
 
-function ResultBars({ result }: { result: VoteResult }) {
-  const totalVoted = result.total_voted || 1;
-  const totalUsers = result.total_users || 1;
-  const participationPct = Math.round((result.total_voted / totalUsers) * 100);
-  const yesPct = Math.round((result.yes_count / totalVoted) * 100);
-  const noPct = Math.round((result.no_count / totalVoted) * 100);
-  const abstainPct = Math.max(0, 100 - yesPct - noPct);
-
-  const bars = [
-    { label: '찬성', count: result.yes_count,     pct: yesPct,     color: 'var(--yes)',     textClass: 'text-green' },
-    { label: '반대', count: result.no_count,      pct: noPct,      color: 'var(--no)',      textClass: 'text-negative' },
-    { label: '기권', count: result.abstain_count, pct: abstainPct, color: 'var(--abstain)', textClass: 'text-text-secondary' },
-  ];
-
-  return (
-    <div className="rounded-2xl bg-surface-2 border border-[var(--hairline)] p-6 space-y-4">
-      <div className="flex items-center gap-2">
-        <BarChart3 size={15} className="text-green" />
-        <span className="text-sm font-bold text-text-base">투표 결과</span>
-        <span className="ml-auto text-xs text-text-secondary">
-          참여 {result.total_voted}명 / {result.total_users}명 ({participationPct}%)
-        </span>
-      </div>
-      <div className="h-1.5 bg-surface rounded-full overflow-hidden">
-        <div className="h-full bg-text-secondary transition-all duration-700" style={{ width: `${participationPct}%` }} />
-      </div>
-      {bars.map(({ label, count, pct, color, textClass }) => (
-        <div key={label}>
-          <div className="flex justify-between text-xs mb-1.5">
-            <span className={cn('font-bold', textClass)}>{label}</span>
-            <span className="text-text-secondary">{count}명 ({pct}%)</span>
-          </div>
-          <div className="h-2.5 bg-surface rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: color }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 const CHOICES = [
   { choice: 'yes'     as const, label: '찬성', Icon: CheckCircle2, hoverBorder: 'hover:border-green hover:text-green' },
   { choice: 'no'      as const, label: '반대', Icon: XCircle,      hoverBorder: 'hover:border-negative hover:text-negative' },
@@ -131,15 +92,23 @@ function AgendaDetail({
   onVote: (choice: 'yes' | 'no' | 'abstain') => Promise<void>;
 }) {
   const [voting, setVoting] = useState(false);
+  const [pending, setPending] = useState<'yes' | 'no' | 'abstain' | null>(null);
 
-  const handleVote = async (choice: 'yes' | 'no' | 'abstain') => {
+  const requestVote = (choice: 'yes' | 'no' | 'abstain') => {
     if (voting || myVote || !item.is_open || result) return;
+    setPending(choice);
+  };
+
+  const confirmVote = async () => {
+    if (!pending) return;
     setVoting(true);
-    await onVote(choice);
+    await onVote(pending);
     setVoting(false);
+    setPending(null);
   };
 
   return (
+    <>
     <div className="flex flex-col h-full p-8 max-md:p-5">
       <div className="mb-5">
         {result ? (
@@ -173,7 +142,7 @@ function AgendaDetail({
 
       <div className="mt-auto">
         {result ? (
-          <ResultBars result={result} />
+          <DisplayBoard agenda={item} published viewer />
         ) : !isLoggedIn ? (
           <div className="rounded-2xl bg-surface-2 border border-[var(--hairline)] p-8 text-center">
             <Lock size={28} className="mx-auto mb-3 text-[#5a5a5a]" />
@@ -207,7 +176,7 @@ function AgendaDetail({
               {CHOICES.map(({ choice, label, Icon, hoverBorder }) => (
                 <button
                   key={choice}
-                  onClick={() => handleVote(choice)}
+                  onClick={() => requestVote(choice)}
                   disabled={voting}
                   className={cn(
                     'flex flex-col max-md:flex-row items-center justify-center gap-2.5 py-6 max-md:py-4 rounded-2xl border-[1.5px] font-bold text-[15px] transition-all duration-150',
@@ -226,6 +195,41 @@ function AgendaDetail({
         )}
       </div>
     </div>
+
+    {pending && (
+      <div
+        className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm p-5"
+        onClick={(e) => { if (e.target === e.currentTarget && !voting) setPending(null); }}
+      >
+        <div className="bg-surface-card rounded-2xl shadow-[var(--shadow-heavy)] w-full max-w-sm border border-[var(--hairline)] overflow-hidden">
+          <div className="p-6">
+            <p className="text-[15px] text-text-base leading-relaxed">
+              <span className="font-bold">{item.title}</span> 안건에 대해{' '}
+              <span className="font-extrabold" style={{ color: CHOICE_COLOR[pending] }}>{VOTE_LABEL[pending]}</span>
+              {VOTE_PARTICLE[pending]} 투표하시겠습니까?
+            </p>
+            <p className="text-xs text-text-secondary mt-2">제출 후에는 변경할 수 없습니다.</p>
+          </div>
+          <div className="flex gap-2 justify-end px-6 pb-6">
+            <button
+              onClick={() => setPending(null)}
+              disabled={voting}
+              className="px-5 py-2 text-sm rounded-lg border border-[var(--hairline)] text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+            >
+              아니오
+            </button>
+            <button
+              onClick={confirmVote}
+              disabled={voting}
+              className="px-5 py-2 text-sm rounded-lg bg-green text-black font-semibold hover:brightness-110 transition-all disabled:opacity-50"
+            >
+              {voting ? '처리 중...' : '예'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
