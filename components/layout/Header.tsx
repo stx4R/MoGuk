@@ -82,7 +82,8 @@ export default function Header() {
   ];
 
   return (
-    <header className="sticky top-[env(safe-area-inset-top)] z-50 w-full bg-[rgba(18,18,18,0.72)] backdrop-blur-[14px] saturate-[160%] border-b border-[var(--hairline)]">
+    // 서비스 종료: pointer-events-none 으로 헤더 인터랙션 차단 (복구 시 제거)
+    <header className="pointer-events-none sticky top-[env(safe-area-inset-top)] z-50 w-full bg-[rgba(18,18,18,0.72)] backdrop-blur-[14px] saturate-[160%] border-b border-[var(--hairline)]">
       <div className="max-w-[var(--maxw)] mx-auto px-6 h-16 flex items-center gap-4">
 
         <Link

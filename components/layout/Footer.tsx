@@ -68,7 +68,8 @@ export default function Footer() {
   };
 
   return (
-    <footer className="border-t border-[var(--hairline)] bg-[#0d0d0d] pb-[env(safe-area-inset-bottom)]">
+    // 서비스 종료: pointer-events-none 으로 푸터 인터랙션 차단 (크레딧 링크만 예외, 복구 시 제거)
+    <footer className="pointer-events-none border-t border-[var(--hairline)] bg-[#0d0d0d] pb-[env(safe-area-inset-bottom)]">
       <div className="max-w-[var(--maxw)] mx-auto px-6 pt-14 pb-10">
 
         <div className="grid grid-cols-2 md:grid-cols-[1.4fr_1fr_1fr_1fr] gap-8">
@@ -162,7 +163,7 @@ export default function Footer() {
                   href={c.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-text-secondary font-semibold underline underline-offset-2 hover:text-green transition-colors"
+                  className="pointer-events-auto text-text-secondary font-semibold underline underline-offset-2 hover:text-green transition-colors"
                 >
                   {c.label}
                 </a>

@@ -3,8 +3,28 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const PROTECTED_ROUTES = ['/vote'];
 
+// 서비스 종료 (운영정책 제 2조 - 다 항). 서비스를 다시 열려면 false 로 변경하세요.
+const SERVICE_CLOSED = true;
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (SERVICE_CLOSED) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Service has been permanently shut down.' },
+        { status: 410, headers: { 'X-Robots-Tag': 'noindex, nofollow' } }
+      );
+    }
+
+    const closedUrl = request.nextUrl.clone();
+    closedUrl.pathname = '/closed';
+    closedUrl.search = '';
+
+    const closed = NextResponse.rewrite(closedUrl);
+    closed.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return closed;
+  }
 
   if (pathname.startsWith('/api/')) return NextResponse.next({ request });
   if (pathname.startsWith('/clubs/')) return NextResponse.next({ request });

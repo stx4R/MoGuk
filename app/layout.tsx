@@ -2,7 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { OnlineUsersProvider } from '@/components/providers/OnlineUsersContext';
-import UserSessionManager from '@/components/providers/UserSessionManager';
+// 서비스 종료: Supabase 실시간 연결 중단 (복구 시 아래 import 와 사용처 주석 해제)
+// import UserSessionManager from '@/components/providers/UserSessionManager';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
@@ -61,13 +62,13 @@ setInterval(function(){
 },100);
 })();` }} />
       </head>
-      <body className="min-h-full flex flex-col bg-bg-base text-text-base pt-[env(safe-area-inset-top)]">
+      <body className="min-h-full md:[@media(min-height:700px)]:h-dvh md:[@media(min-height:700px)]:overflow-hidden flex flex-col bg-bg-base text-text-base pt-[env(safe-area-inset-top)]">
         <div aria-hidden className="fixed inset-x-0 top-0 z-[9999] h-[env(safe-area-inset-top)] bg-bg-base" />
         <ThemeProvider>
           <OnlineUsersProvider>
-            <UserSessionManager />
+            {/* <UserSessionManager /> */}
             <Header />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1 md:[@media(min-height:700px)]:min-h-0 flex">{children}</main>
             <Footer />
           </OnlineUsersProvider>
         </ThemeProvider>
